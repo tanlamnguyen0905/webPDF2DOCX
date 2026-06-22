@@ -1,0 +1,4 @@
+# Override cho môi trường local development.
+spring:
+  jpa:
+    show-sql: true

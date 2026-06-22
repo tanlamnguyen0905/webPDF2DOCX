@@ -1,0 +1,104 @@
+# Docker Compose cho môi trường local development.
+# Bật toàn bộ: MySQL, LocalStack (S3 + SQS), backend, worker, frontend.
+# Biến môi trường đọc từ file .env (xem .env.example).
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: pdf2word-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./infra/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: pdf2word-localstack
+    restart: unless-stopped
+    environment:
+      SERVICES: s3,sqs
+      DEFAULT_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      SQS_QUEUE_NAME: ${SQS_QUEUE_NAME}
+      SQS_DLQ_NAME: ${SQS_DLQ_NAME}
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./infra/localstack/init:/etc/localstack/init/ready.d:ro
+      - localstack-data:/var/lib/localstack
+
+  backend:
+    build:
+      context: ./backend
+    container_name: pdf2word-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      localstack:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRATION_SECONDS: ${JWT_ACCESS_EXPIRATION_SECONDS}
+      JWT_REFRESH_EXPIRATION_SECONDS: ${JWT_REFRESH_EXPIRATION_SECONDS}
+      WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL}
+      S3_BUCKET: ${S3_BUCKET}
+      SQS_QUEUE_NAME: ${SQS_QUEUE_NAME}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  worker:
+    build:
+      context: ./worker
+    container_name: pdf2word-worker
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - localstack
+    environment:
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL}
+      S3_BUCKET: ${S3_BUCKET}
+      SQS_QUEUE_NAME: ${SQS_QUEUE_NAME}
+      BACKEND_INTERNAL_BASE_URL: http://backend:8080/api/v1/internal/worker
+      WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET}
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: pdf2word-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  mysql-data:
+  localstack-data:

@@ -1,0 +1,8 @@
+# Worker Python — nhận job từ SQS, convert PDF -> DOCX, callback backend.
+boto3==1.34.131            # SQS + S3 (tương thích LocalStack)
+requests==2.32.3          # gọi internal callback API của backend
+pdf2docx==0.5.8           # convert PDF -> DOCX (PDF dạng text)
+python-dotenv==1.0.1      # đọc biến môi trường từ .env khi chạy local
+# OCR (tùy chọn, cho PDF scan) — bật khi triển khai OCR:
+# pytesseract==0.3.13
+# pdf2image==1.17.0

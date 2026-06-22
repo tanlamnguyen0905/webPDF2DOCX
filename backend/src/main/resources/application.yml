@@ -1,0 +1,49 @@
+# Cấu hình chung (mặc định). Profile local nằm ở application-local.yml.
+spring:
+  application:
+    name: pdf-converter-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/pdf_converter?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${SPRING_DATASOURCE_USERNAME:pdf_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:pdf_password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+server:
+  port: ${BACKEND_PORT:8080}
+  servlet:
+    context-path: /
+
+# Cấu hình ứng dụng tùy biến
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-to-a-long-random-secret}
+    access-expiration-seconds: ${JWT_ACCESS_EXPIRATION_SECONDS:3600}
+    refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:604800}
+  worker:
+    shared-secret: ${WORKER_SHARED_SECRET:change-me-worker-secret}
+  aws:
+    region: ${AWS_REGION:us-east-1}
+    access-key: ${AWS_ACCESS_KEY_ID:test}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+    endpoint-url: ${AWS_ENDPOINT_URL:http://localhost:4566}
+    s3-bucket: ${S3_BUCKET:pdf-converter}
+    sqs-queue-name: ${SQS_QUEUE_NAME:pdf-conversion-jobs}
+
+logging:
+  level:
+    com.pdfconverter: DEBUG
