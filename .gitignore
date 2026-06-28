@@ -19,24 +19,56 @@ yarn-error.log*
 # Java / Maven
 target/
 *.class
+*.jar
+*.war
+*.ear
 .mvn/wrapper/maven-wrapper.jar
+.mvn/timing/
+.mvn/log/
+hs_err_pid*
+replay_pid*
 
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.eggs/
 env/
 venv/
 .venv/
-*.egg-info/
 .pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
 
 # IDE
 .idea/
 .vscode/
 *.iml
+*.iws
+*.ipr
 *.suo
 *.sw?
+.settings/
+.project
+.classpath
+.factorypath
 
 # Build / storage artifacts
 *.log
@@ -50,8 +82,26 @@ mysql-data/
 *.sqlite3
 *.db
 
+# Docker
+docker-compose.override.yml
+*.pid
+docker/data/
+
 # OS
 .DS_Store
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+$RECYCLE.BIN/
+
+# Claude AI / Memory
+.claude/
+.serena/
+MEMORY.md
+
+# Project specific
+stitch_pdf_coin_converter_system
+*.code-workspace
+backup/
+*.patch
+*.diff
