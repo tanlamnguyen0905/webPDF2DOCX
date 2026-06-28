@@ -1,8 +1,10 @@
 # API Specification - Website Convert PDF to Word
 
-**Phiên bản:** 1.0 MVP  
+**Phiên bản:** 2.0  
+**Ngày:** 2026-06-28  
 **Công nghệ:** Next.js + Spring Boot + MySQL Docker + LocalStack S3 + LocalStack SQS + Python Worker  
-**Mục tiêu:** Định nghĩa REST API giữa frontend Next.js, backend Spring Boot, MySQL, S3-compatible storage, SQS-compatible queue và Python Worker convert file.
+**Mục tiêu:** Định nghĩa REST API giữa frontend Next.js, backend Spring Boot, MySQL, S3-compatible storage, SQS-compatible queue và Python Worker convert file.  
+**Map:** Đồng bộ với schema.md v2.0 (22 bảng) và UI Design (MVP + Future).
 
 ---
 
@@ -219,8 +221,9 @@ Dùng ISO-8601:
 ### 3.1. User
 
 ```text
-UserRole = USER | ADMIN | SUPPORT
+UserRole = USER | ADMIN | SUPPORT | DEVELOPER
 UserStatus = ACTIVE | LOCKED | BANNED
+UserSubscriptionTier = FREE | PREMIUM | VIP
 ```
 
 ### 3.2. Conversion
@@ -266,6 +269,39 @@ TicketStatus = NEW | IN_PROGRESS | REPLIED | RESOLVED | CANCELED
 MessageSenderRole = USER | SUPPORT | ADMIN | BOT | SYSTEM
 ```
 
+### 3.6. Subscription
+
+```text
+SubscriptionPlanDuration = WEEKLY | MONTHLY | YEARLY
+SubscriptionStatus = ACTIVE | EXPIRED | CANCELED | TRIAL
+```
+
+### 3.7. Batch
+
+```text
+BatchJobStatus = PROCESSING | COMPLETED | PARTIAL_SUCCESS | FAILED
+```
+
+### 3.8. API Key & Webhook
+
+```text
+ApiKeyStatus = ACTIVE | DISABLED | REVOKED
+WebhookStatus = ACTIVE | DISABLED
+WebhookEvent = CONVERT_COMPLETED | CONVERT_FAILED
+```
+
+### 3.9. Notification
+
+```text
+NotificationType = CONVERT_DONE | COIN_ADDED | SYSTEM | PROMOTION
+```
+
+### 3.10. Virus Scan
+
+```text
+VirusScanStatus = CLEAN | INFECTED | ERROR | SKIPPED
+```
+
 ---
 
 ## 4. Object schema chính
@@ -277,8 +313,10 @@ MessageSenderRole = USER | SUPPORT | ADMIN | BOT | SYSTEM
   "id": 1,
   "fullName": "Nguyen Van A",
   "email": "user@example.com",
+  "avatarUrl": "https://storage.example.com/avatars/1.jpg",
   "role": "USER",
   "coinBalance": 100,
+  "subscriptionTier": "FREE",
   "status": "ACTIVE",
   "lastLoginAt": "2026-06-22T10:00:00Z",
   "createdAt": "2026-06-01T10:00:00Z",
@@ -310,6 +348,18 @@ MessageSenderRole = USER | SUPPORT | ADMIN | BOT | SYSTEM
     "totalPages": 12,
     "contentType": "application/pdf"
   },
+  "scanAnalysis": {
+    "scanDetected": false,
+    "isScannedPdf": true,
+    "recommendedProcessingType": "NORMAL",
+    "message": "Phát hiện PDF scan, khuyên dùng OCR."
+  },
+  "virusScan": {
+    "status": "CLEAN",
+    "scanner": "ClamAV",
+    "message": null,
+    "scannedAt": "2026-06-22T10:00:00Z"
+  },
   "freeEligibility": {
     "eligible": true,
     "remainingFreeUsesToday": 4,
@@ -335,10 +385,21 @@ MessageSenderRole = USER | SUPPORT | ADMIN | BOT | SYSTEM
   "totalPages": 12,
   "conversionMode": "PREMIUM",
   "processingType": "NORMAL",
+  "source": "WEB",
+  "conversionSettings": {
+    "preserveTables": true,
+    "preserveImages": true,
+    "fontMode": "AUTO",
+    "preserveHeaders": true,
+    "imageQuality": "HIGH"
+  },
   "coinEstimated": 12,
   "coinCharged": 12,
   "status": "SUCCESS",
   "queuePriority": 1,
+  "queuePosition": 0,
+  "estimatedTimeRemaining": 0,
+  "retryCount": 0,
   "errorMessage": null,
   "startedAt": "2026-06-22T10:01:00Z",
   "completedAt": "2026-06-22T10:02:30Z",
@@ -372,12 +433,14 @@ MessageSenderRole = USER | SUPPORT | ADMIN | BOT | SYSTEM
   "id": 5001,
   "paymentCode": "PAY-20260622-000001",
   "coinPackageId": 1,
+  "subscriptionId": null,
   "amountVnd": 10000,
   "coinAmount": 100,
   "paymentMethod": "MANUAL",
   "status": "PENDING",
   "paymentContent": "NAPCOIN 5001 USER1",
   "providerTransactionCode": null,
+  "paymentUrl": null,
   "note": null,
   "paidAt": null,
   "createdAt": "2026-06-22T10:00:00Z",
@@ -433,6 +496,123 @@ MessageSenderRole = USER | SUPPORT | ADMIN | BOT | SYSTEM
   "dataType": "INT",
   "description": "Dung lượng file tối đa cho chế độ miễn phí",
   "updatedAt": "2026-06-22T10:00:00Z"
+}
+```
+
+---
+
+### 4.10. SubscriptionPlanDto
+
+```json
+{
+  "id": 1,
+  "name": "Gói Tháng",
+  "priceVnd": 50000,
+  "durationDays": 30,
+  "coinBonus": 0,
+  "priorityLevel": 1,
+  "maxFileSizeMb": 100,
+  "ocrIncluded": true,
+  "features": {
+    "unlimitedConversions": true,
+    "priorityQueue": true,
+    "ocrFree": true,
+    "fileRetentionHours": 72,
+    "supportPriority": true
+  },
+  "isActive": true,
+  "sortOrder": 2,
+  "createdAt": "2026-06-01T00:00:00Z"
+}
+```
+
+### 4.11. UserSubscriptionDto
+
+```json
+{
+  "id": 1,
+  "plan": {
+    "id": 1,
+    "name": "Gói Tháng"
+  },
+  "startAt": "2026-06-01T00:00:00Z",
+  "endAt": "2026-07-01T00:00:00Z",
+  "autoRenew": true,
+  "isTrial": false,
+  "status": "ACTIVE",
+  "daysRemaining": 15,
+  "canceledAt": null
+}
+```
+
+### 4.12. BatchJobDto
+
+```json
+{
+  "id": 1,
+  "batchCode": "BATCH-20260628-000001",
+  "status": "PROCESSING",
+  "totalFiles": 10,
+  "completedFiles": 4,
+  "failedFiles": 0,
+  "files": [
+    {
+      "conversionJobId": 1001,
+      "originalFileName": "doc1.pdf",
+      "status": "SUCCESS",
+      "downloadAvailable": true
+    }
+  ],
+  "zipAvailable": false,
+  "zipExpiredAt": null,
+  "createdAt": "2026-06-28T10:00:00Z"
+}
+```
+
+### 4.13. ApiKeyDto
+
+```json
+{
+  "id": 1,
+  "name": "Production Key",
+  "prefix": "cvpdf_live_",
+  "maskedKey": "cvpdf_live_****abcd",
+  "rateLimit": 1000,
+  "status": "ACTIVE",
+  "lastUsedAt": "2026-06-28T10:00:00Z",
+  "expiresAt": null,
+  "createdAt": "2026-06-01T00:00:00Z"
+}
+```
+
+### 4.14. WebhookDto
+
+```json
+{
+  "id": 1,
+  "url": "https://partner.com/webhook/pdf-converter",
+  "events": ["CONVERT_COMPLETED", "CONVERT_FAILED"],
+  "status": "ACTIVE",
+  "lastTriggeredAt": "2026-06-28T09:00:00Z",
+  "lastHttpStatus": 200,
+  "createdAt": "2026-06-01T00:00:00Z"
+}
+```
+
+### 4.15. NotificationDto
+
+```json
+{
+  "id": 1,
+  "type": "CONVERT_DONE",
+  "title": "Chuyển đổi hoàn tất",
+  "content": "File example.pdf đã được chuyển đổi thành công.",
+  "data": {
+    "conversionJobId": 1001
+  },
+  "actionUrl": "/result/1001",
+  "isRead": false,
+  "createdAt": "2026-06-28T10:02:30Z"
 }
 ```
 
@@ -635,7 +815,40 @@ Role: USER, SUPPORT, ADMIN
 
 Response `200`: `UserDto`
 
-### 5.8. Cập nhật hồ sơ cá nhân
+### 5.8. Upload avatar
+
+```http
+POST /api/v1/users/me/avatar
+```
+
+Role: USER, SUPPORT, ADMIN
+
+Content-Type: `multipart/form-data`
+
+| Field | Type | Required | Mô tả |
+|---|---|---|---:|---|
+| `avatar` | File | Yes | Ảnh đại diện, ≤ 2MB, jpg/png/gif |
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "avatarUrl": "https://storage.example.com/avatars/1.jpg"
+  },
+  "message": "Cập nhật avatar thành công."
+}
+```
+
+Error:
+
+| Code | HTTP | Mô tả |
+|---|---:|---|
+| `FILE_TOO_LARGE` | 413 | File > 2MB |
+| `INVALID_FILE_TYPE` | 415 | Không phải ảnh |
+
+### 5.9. Cập nhật hồ sơ cá nhân
 
 ```http
 PATCH /api/v1/users/me
@@ -653,7 +866,7 @@ Request:
 
 Response `200`: `UserDto`
 
-### 5.9. Đổi mật khẩu
+### 5.10. Đổi mật khẩu
 
 ```http
 PATCH /api/v1/users/me/password
@@ -1010,7 +1223,32 @@ Request:
 
 Response `202`: `ConversionJobDto`.
 
-### 6.10. Kiểm tra lượt miễn phí hôm nay
+### 6.10. Hủy conversion job
+
+```http
+POST /api/v1/conversions/{id}/cancel
+```
+
+Role: Owner USER
+
+Chỉ cho phép cancel khi:
+- Job `PENDING` hoặc `QUEUED`.
+- Job thuộc user hiện tại.
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1001,
+    "status": "DELETED"
+  },
+  "message": "Đã hủy yêu cầu convert."
+}
+```
+
+### 6.11. Kiểm tra lượt miễn phí hôm nay
 
 ```http
 GET /api/v1/conversions/free-usage/today
@@ -1226,11 +1464,436 @@ Chỉ được hủy khi `status = PENDING`.
 
 Response `200`: `PaymentDto` với `status = CANCELED`.
 
+### 8.6. Tạo thanh toán MoMo
+
+```http
+POST /api/v1/payments/momo
+```
+
+Role: USER
+
+**Giai đoạn**: Phase 2
+
+Request:
+
+```json
+{
+  "coinPackageId": 1
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "paymentId": 5001,
+    "paymentUrl": "https://test-payment.momo.vn/...",
+    "deepLink": "momo://app?..." ,
+    "qrCodeUrl": "https://...",
+    "expiresAt": "2026-06-22T10:15:00Z"
+  },
+  "message": "Đã tạo giao dịch MoMo."
+}
+```
+
+### 8.7. MoMo webhook callback
+
+```http
+POST /api/v1/webhooks/momo
+```
+
+Role: Public (MoMo server)
+
+**Giai đoạn**: Phase 2
+
+Request: MoMo IPN (Instant Payment Notification).
+
+Response `200`:
+
+```json
+{
+  "success": true
+}
+```
+
+Backend xử lý:
+1. Xác thực chữ ký MoMo.
+2. Kiểm tra mã giao dịch trùng.
+3. Cập nhật payment status.
+4. Cộng coin nếu thành công.
+
+### 8.8. Tạo thanh toán VNPAY
+
+```http
+POST /api/v1/payments/vnpay
+```
+
+Role: USER
+
+**Giai đoạn**: Phase 2
+
+Request:
+
+```json
+{
+  "coinPackageId": 1
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "paymentId": 5002,
+    "paymentUrl": "https://sandbox.vnpayment.vn/...",
+    "expiresAt": "2026-06-22T10:15:00Z"
+  }
+}
+```
+
+### 8.9. VNPAY return URL
+
+```http
+GET /api/v1/payments/vnpay/return
+```
+
+Role: Public
+
+Query params: `?vnp_TransactionNo=xxx&vnp_ResponseCode=00&vnp_SecureHash=...`
+
+Response `302`: Redirect to `/payment/result?id=xxx`
+
+Backend: Verify secure hash trước khi redirect.
+
 ---
 
-## 9. API hỗ trợ và khiếu nại
+## 9. API Subscription & Gói thành viên
 
-### 9.1. Tạo ticket hỗ trợ
+**Giai đoạn**: Phase 4
+
+### 9.1. Danh sách gói subscription
+
+```http
+GET /api/v1/subscription/plans
+```
+
+Role: Public
+
+Response `200`: list `SubscriptionPlanDto`.
+
+### 9.2. Đăng ký subscription
+
+```http
+POST /api/v1/subscription
+```
+
+Role: USER
+
+Request:
+
+```json
+{
+  "planId": 1,
+  "paymentMethod": "MOMO"
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "userSubscription": {},
+    "payment": {
+      "id": 5003,
+      "paymentUrl": "https://..."
+    }
+  }
+}
+```
+
+### 9.3. Subscription hiện tại
+
+```http
+GET /api/v1/subscription/current
+```
+
+Role: USER
+
+Response `200`: `UserSubscriptionDto` hoặc `null`.
+
+### 9.4. Hủy subscription
+
+```http
+POST /api/v1/subscription/cancel
+```
+
+Role: USER
+
+Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Đã hủy gia hạn. Gói sẽ hết hạn vào ngày X."
+}
+```
+
+---
+
+## 10. API Batch Convert
+
+**Giai đoạn**: Phase 3
+
+Map: ui_des_future.md §5.1-5.2, schema.md §5.17
+
+### 10.1. Tạo batch
+
+```http
+POST /api/v1/batches
+```
+
+Role: USER
+
+Content-Type: `multipart/form-data`
+
+| Field | Type | Required | Mô tả |
+|---|---|---|---:|---|
+| `files` | File[] | Yes | Nhiều file PDF |
+| `conversionMode` | String | No | Mặc định FREE |
+| `processingType` | String | No | Mặc định NORMAL |
+
+Response `201`: `BatchJobDto`
+
+### 10.2. Chi tiết batch
+
+```http
+GET /api/v1/batches/{id}
+```
+
+Role: Owner USER
+
+Response `200`: `BatchJobDto`
+
+### 10.3. Danh sách batch
+
+```http
+GET /api/v1/batches
+```
+
+Role: USER
+
+Query: `page`, `size`, `status`
+
+Response `200`: paginated `BatchJobDto`.
+
+### 10.4. Tải ZIP batch
+
+```http
+GET /api/v1/batches/{id}/download
+```
+
+Role: Owner USER
+
+Response `200`: stream file ZIP.
+
+---
+
+## 11. API API Keys (Developer)
+
+**Giai đoạn**: Phase 4
+
+Map: ui_des_future.md §5.4, schema.md §5.18
+
+### 11.1. Danh sách API key
+
+```http
+GET /api/v1/api-keys
+```
+
+Role: USER (chỉ xem key của mình)
+
+Response `200`: list `ApiKeyDto`.
+
+### 11.2. Tạo API key
+
+```http
+POST /api/v1/api-keys
+```
+
+Role: USER
+
+Request:
+
+```json
+{
+  "name": "Production Key",
+  "rateLimit": 1000,
+  "expiresAt": null
+}
+```
+
+Response `201`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "apiKey": "cvpdf_live_abc123def456",
+    "apiKeyDto": {}
+  },
+  "message": "API key được hiển thị một lần duy nhất."
+}
+```
+
+### 11.3. Thu hồi API key
+
+```http
+DELETE /api/v1/api-keys/{id}
+```
+
+Role: Owner USER
+
+Response `204`.
+
+### 11.4. Vô hiệu hóa / Kích hoạt API key
+
+```http
+PATCH /api/v1/api-keys/{id}/status
+```
+
+Role: Owner USER
+
+Request:
+
+```json
+{
+  "status": "DISABLED"
+}
+```
+
+Response `200`: `ApiKeyDto`.
+
+---
+
+## 12. API Webhooks
+
+**Giai đoạn**: Phase 4
+
+Map: ui_des_future.md §5.5, schema.md §5.19
+
+### 12.1. Danh sách webhook
+
+```http
+GET /api/v1/webhooks
+```
+
+Role: USER
+
+### 12.2. Tạo webhook
+
+```http
+POST /api/v1/webhooks
+```
+
+Role: USER
+
+Request:
+
+```json
+{
+  "url": "https://partner.com/webhook",
+  "events": ["CONVERT_COMPLETED", "CONVERT_FAILED"]
+}
+```
+
+Response `201`: `WebhookDto`.
+
+### 12.3. Cập nhật webhook
+
+```http
+PATCH /api/v1/webhooks/{id}
+```
+
+Role: Owner USER
+
+### 12.4. Xóa webhook
+
+```http
+DELETE /api/v1/webhooks/{id}
+```
+
+Role: Owner USER
+
+Response `204`.
+
+---
+
+## 13. API Notifications
+
+**Giai đoạn**: Phase 3
+
+Map: ui_des_future.md §5.7, schema.md §5.20
+
+### 13.1. Danh sách notification
+
+```http
+GET /api/v1/notifications
+```
+
+Role: USER
+
+Query: `page`, `size`, `isRead`
+
+Response `200`: paginated `NotificationDto`.
+
+### 13.2. Đánh dấu đã đọc
+
+```http
+PATCH /api/v1/notifications/{id}/read
+```
+
+Role: Owner USER
+
+Response `204`.
+
+### 13.3. Đánh dấu tất cả đã đọc
+
+```http
+POST /api/v1/notifications/read-all
+```
+
+Role: USER
+
+Response `204`.
+
+### 13.4. Đếm notification chưa đọc
+
+```http
+GET /api/v1/notifications/unread-count
+```
+
+Role: USER
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "count": 5
+  }
+}
+```
+
+## 14. API hỗ trợ và khiếu nại
+
+### 14.1. Tạo ticket hỗ trợ
 
 ```http
 POST /api/v1/tickets
@@ -1258,7 +1921,7 @@ Backend mặc định:
 - `status = NEW`
 - Tạo `support_messages` đầu tiên từ `content`.
 
-### 9.2. Danh sách ticket của user
+### 14.2. Danh sách ticket của user
 
 ```http
 GET /api/v1/tickets
@@ -1277,7 +1940,7 @@ Query:
 
 Response `200`: paginated `SupportTicketDto`.
 
-### 9.3. Chi tiết ticket
+### 14.3. Chi tiết ticket
 
 ```http
 GET /api/v1/tickets/{id}
@@ -1287,7 +1950,7 @@ Role: Owner USER, SUPPORT assigned, ADMIN
 
 Response `200`: `SupportTicketDto`.
 
-### 9.4. Lấy tin nhắn trong ticket
+### 14.4. Lấy tin nhắn trong ticket
 
 ```http
 GET /api/v1/tickets/{id}/messages
@@ -1315,7 +1978,7 @@ Response `200`:
 }
 ```
 
-### 9.5. Gửi tin nhắn ticket
+### 14.5. Gửi tin nhắn ticket
 
 ```http
 POST /api/v1/tickets/{id}/messages
@@ -1344,7 +2007,7 @@ Response `201`.
 
 Nếu ticket đang `RESOLVED` hoặc `CANCELED`, không cho gửi trừ khi reopen.
 
-### 9.6. Đánh dấu ticket đã giải quyết
+### 14.6. Đánh dấu ticket đã giải quyết
 
 ```http
 POST /api/v1/tickets/{id}/resolve
@@ -1354,7 +2017,7 @@ Role: Owner USER, SUPPORT, ADMIN
 
 Response `200`: `SupportTicketDto` với `status = RESOLVED`.
 
-### 9.7. Hủy ticket
+### 14.7. Hủy ticket
 
 ```http
 POST /api/v1/tickets/{id}/cancel
@@ -1366,11 +2029,11 @@ Response `200`: `SupportTicketDto` với `status = CANCELED`.
 
 ---
 
-## 10. API chatbot AI
+## 15. API chatbot AI
 
 MVP có thể dùng chatbot rule-based hoặc mock response. Phiên bản nâng cấp có thể tích hợp AI thật.
 
-### 10.1. Tạo phiên chatbot
+### 15.1. Tạo phiên chatbot
 
 ```http
 POST /api/v1/chatbot/conversations
@@ -1399,7 +2062,7 @@ Response `201`:
 }
 ```
 
-### 10.2. Gửi tin nhắn chatbot
+### 15.2. Gửi tin nhắn chatbot
 
 ```http
 POST /api/v1/chatbot/conversations/{id}/messages
@@ -1437,7 +2100,7 @@ Response `201`:
 }
 ```
 
-### 10.3. Lấy lịch sử chatbot
+### 15.3. Lấy lịch sử chatbot
 
 ```http
 GET /api/v1/chatbot/conversations/{id}/messages
@@ -1447,7 +2110,7 @@ Role: Owner USER hoặc guest token
 
 Response `200`.
 
-### 10.4. Đánh giá câu trả lời chatbot
+### 15.4. Đánh giá câu trả lời chatbot
 
 ```http
 POST /api/v1/chatbot/messages/{id}/rating
@@ -1465,7 +2128,7 @@ Request:
 
 Response `204`.
 
-### 10.5. Chuyển chatbot sang ticket
+### 15.5. Chuyển chatbot sang ticket
 
 ```http
 POST /api/v1/chatbot/conversations/{id}/escalate
@@ -1487,11 +2150,11 @@ Response `201`: `SupportTicketDto`.
 
 ---
 
-## 11. API admin
+## 16. API admin
 
 Tất cả API admin yêu cầu role `ADMIN`.
 
-### 11.1. Dashboard summary
+### 16.1. Dashboard summary
 
 ```http
 GET /api/v1/admin/dashboard/summary
@@ -1517,7 +2180,7 @@ Response `200`:
 }
 ```
 
-### 11.2. Danh sách user
+### 16.2. Danh sách user
 
 ```http
 GET /api/v1/admin/users
@@ -1535,7 +2198,7 @@ Query:
 
 Response `200`: paginated `UserDto`.
 
-### 11.3. Chi tiết user
+### 16.3. Chi tiết user
 
 ```http
 GET /api/v1/admin/users/{id}
@@ -1543,7 +2206,7 @@ GET /api/v1/admin/users/{id}
 
 Response `200`: `UserDto`.
 
-### 11.4. Cập nhật trạng thái user
+### 16.4. Cập nhật trạng thái user
 
 ```http
 PATCH /api/v1/admin/users/{id}/status
@@ -1560,7 +2223,7 @@ Request:
 
 Response `200`: `UserDto`.
 
-### 11.5. Cập nhật role user
+### 16.5. Cập nhật role user
 
 ```http
 PATCH /api/v1/admin/users/{id}/role
@@ -1576,7 +2239,7 @@ Request:
 
 Response `200`: `UserDto`.
 
-### 11.6. Điều chỉnh coin thủ công
+### 16.6. Điều chỉnh coin thủ công
 
 ```http
 POST /api/v1/admin/users/{id}/coin-adjustments
@@ -1608,7 +2271,7 @@ Backend bắt buộc:
 - Tạo `coin_transactions`.
 - Ghi `admin_audit_logs`.
 
-### 11.7. Admin quản lý gói coin
+### 16.7. Admin quản lý gói coin
 
 #### Danh sách
 
@@ -1667,7 +2330,7 @@ Response `204`.
 
 Ghi chú: MVP nên tắt `isActive = false`, không xóa cứng nếu đã có payment liên quan.
 
-### 11.8. Admin quản lý payment
+### 16.8. Admin quản lý payment
 
 #### Danh sách payment
 
@@ -1762,7 +2425,7 @@ Request:
 
 Response `200`.
 
-### 11.9. Admin quản lý conversion
+### 16.9. Admin quản lý conversion
 
 #### Danh sách conversion jobs
 
@@ -1811,7 +2474,7 @@ Request:
 
 Response `200`: `ConversionJobDto`.
 
-### 11.10. Admin xem coin transactions
+### 16.10. Admin xem coin transactions
 
 ```http
 GET /api/v1/admin/coin-transactions
@@ -1831,7 +2494,7 @@ Query:
 
 Response `200`: paginated `CoinTransactionDto`.
 
-### 11.11. Admin quản lý ticket
+### 16.11. Admin quản lý ticket
 
 ```http
 GET /api/v1/admin/tickets
@@ -1882,7 +2545,7 @@ Request:
 
 Response `200`.
 
-### 11.12. Admin cấu hình hệ thống
+### 16.12. Admin cấu hình hệ thống
 
 #### Lấy settings
 
@@ -1946,7 +2609,7 @@ Request:
 
 Response `200`.
 
-### 11.13. Admin audit logs
+### 16.13. Admin audit logs
 
 ```http
 GET /api/v1/admin/audit-logs
@@ -1966,11 +2629,11 @@ Response `200`.
 
 ---
 
-## 12. API support dashboard
+## 17. API support dashboard
 
 Các API này dành cho `SUPPORT` và `ADMIN`.
 
-### 12.1. Support dashboard summary
+### 17.1. Support dashboard summary
 
 ```http
 GET /api/v1/support/dashboard/summary
@@ -1992,7 +2655,7 @@ Response:
 }
 ```
 
-### 12.2. Danh sách ticket cho support
+### 17.2. Danh sách ticket cho support
 
 ```http
 GET /api/v1/support/tickets
@@ -2011,7 +2674,7 @@ Query:
 
 Response `200`: paginated `SupportTicketDto`.
 
-### 12.3. Nhận xử lý ticket
+### 17.3. Nhận xử lý ticket
 
 ```http
 POST /api/v1/support/tickets/{id}/claim
@@ -2021,7 +2684,7 @@ Role: SUPPORT, ADMIN
 
 Response `200`: `SupportTicketDto`.
 
-### 12.4. Cập nhật trạng thái ticket
+### 17.4. Cập nhật trạng thái ticket
 
 ```http
 PATCH /api/v1/support/tickets/{id}/status
@@ -2039,7 +2702,7 @@ Request:
 
 Response `200`.
 
-### 12.5. Chuyển ticket cho admin
+### 17.5. Chuyển ticket cho admin
 
 ```http
 POST /api/v1/support/tickets/{id}/escalate-to-admin
@@ -2059,11 +2722,11 @@ Response `200`.
 
 ---
 
-## 13. Internal Worker API
+## 18. Internal Worker API
 
 Các endpoint này không được public. Chỉ Python Worker gọi được bằng `X-Worker-Token`.
 
-### 13.1. Worker báo bắt đầu xử lý
+### 18.1. Worker báo bắt đầu xử lý
 
 ```http
 POST /api/v1/internal/worker/conversions/{id}/started
@@ -2091,7 +2754,7 @@ Backend cập nhật:
 - `status = PROCESSING`
 - `started_at = startedAt`
 
-### 13.2. Worker báo tiến độ
+### 18.2. Worker báo tiến độ
 
 ```http
 POST /api/v1/internal/worker/conversions/{id}/progress
@@ -2111,7 +2774,7 @@ Response `204`.
 
 Ghi chú: MVP có thể bỏ qua endpoint này nếu chưa lưu progress.
 
-### 13.3. Worker báo convert thành công
+### 18.3. Worker báo convert thành công
 
 ```http
 POST /api/v1/internal/worker/conversions/{id}/completed
@@ -2146,7 +2809,7 @@ Backend xử lý trong transaction:
    - FREE: `completedAt + free_file_storage_hours`
    - PREMIUM: `completedAt + premium_file_storage_hours`
 
-### 13.4. Worker báo convert thất bại
+### 18.4. Worker báo convert thất bại
 
 ```http
 POST /api/v1/internal/worker/conversions/{id}/failed
@@ -2173,7 +2836,7 @@ Backend xử lý:
 3. Nếu đã trừ coin, tạo `coin_transactions` loại `REFUND`.
 4. Không trừ coin nếu chính sách trừ coin sau khi thành công.
 
-### 13.5. Worker heartbeat
+### 18.5. Worker heartbeat
 
 ```http
 POST /api/v1/internal/worker/heartbeat
@@ -2196,9 +2859,9 @@ Ghi chú: MVP có thể chưa cần lưu heartbeat.
 
 ---
 
-## 14. SQS message specification
+## 19. SQS message specification
 
-### 14.1. Queue
+### 19.1. Queue
 
 LocalStack:
 
@@ -2213,7 +2876,7 @@ Production:
 Queue name: pdf-conversion-jobs
 ```
 
-### 14.2. Message body
+### 19.2. Message body
 
 ```json
 {
@@ -2251,7 +2914,7 @@ Queue name: pdf-conversion-jobs
 }
 ```
 
-### 14.3. Message attributes
+### 19.3. Message attributes
 
 | Attribute | Type | Ví dụ |
 |---|---|---|
@@ -2260,7 +2923,7 @@ Queue name: pdf-conversion-jobs
 | `processingType` | String | `NORMAL` |
 | `priority` | Number | `1` |
 
-### 14.4. Retry và dead-letter queue
+### 19.4. Retry và dead-letter queue
 
 Đề xuất:
 
@@ -2279,9 +2942,9 @@ Worker phải idempotent:
 
 ---
 
-## 15. S3 object key convention
+## 20. S3 object key convention
 
-### 15.1. Bucket
+### 20.1. Bucket
 
 Local:
 
@@ -2289,7 +2952,7 @@ Local:
 pdf-converter
 ```
 
-### 15.2. Object keys
+### 20.2. Object keys
 
 | Loại file | Key pattern |
 |---|---|
@@ -2298,7 +2961,7 @@ pdf-converter
 | DOCX kết quả | `output/{conversionJobId}/{safeBaseName}.docx` |
 | Ticket attachment | `support/{ticketId}/{uuid}-{safeFileName}` |
 
-### 15.3. Metadata
+### 20.3. Metadata
 
 PDF object metadata:
 
@@ -2321,7 +2984,7 @@ DOCX object metadata:
 }
 ```
 
-### 15.4. Security
+### 20.4. Security
 
 - Không public bucket.
 - Không trả S3 key thô cho frontend nếu không cần.
@@ -2330,9 +2993,9 @@ DOCX object metadata:
 
 ---
 
-## 16. Quy tắc nghiệp vụ quan trọng
+## 21. Quy tắc nghiệp vụ quan trọng
 
-### 16.1. Convert miễn phí
+### 21.1. Convert miễn phí
 
 Điều kiện:
 
@@ -2343,7 +3006,7 @@ DOCX object metadata:
 - Không tốn coin.
 - File kết quả lưu `free_file_storage_hours`, mặc định 1 giờ.
 
-### 16.2. Convert nâng cao
+### 21.2. Convert nâng cao
 
 Điều kiện:
 
@@ -2354,7 +3017,7 @@ DOCX object metadata:
 - Queue ưu tiên cao hơn FREE.
 - File kết quả lưu `premium_file_storage_hours`, mặc định 24 giờ.
 
-### 16.3. Công thức tính coin
+### 21.3. Công thức tính coin
 
 Đề xuất:
 
@@ -2376,7 +3039,7 @@ coin_ocr_per_page = 2
 coin_after_30_pages_per_page = 3
 ```
 
-### 16.4. Thời điểm trừ coin
+### 21.4. Thời điểm trừ coin
 
 MVP đề xuất: **trừ coin khi convert thành công**.
 
@@ -2398,7 +3061,7 @@ Cách chặt chẽ hơn cho phiên bản sau:
 - Trừ chính thức khi success.
 - Release reserve khi failed.
 
-### 16.5. Không xử lý trùng
+### 21.5. Không xử lý trùng
 
 Các nghiệp vụ sau phải idempotent:
 
@@ -2416,7 +3079,7 @@ Nên dùng:
 
 ---
 
-## 17. Error code catalog
+## 22. Error code catalog
 
 | Code | HTTP | Mô tả |
 |---|---:|---|
@@ -2449,23 +3112,23 @@ Nên dùng:
 
 ---
 
-## 18. Security requirement
+## 23. Security requirement
 
-### 18.1. Password
+### 23.1. Password
 
 - Lưu `password_hash`, không lưu plain text.
 - Dùng BCrypt hoặc Argon2.
 - Reset password token phải hash trước khi lưu DB.
 - Reset token có hạn ngắn, ví dụ 15-30 phút.
 
-### 18.2. JWT
+### 23.2. JWT
 
 - Access token ngắn hạn, ví dụ 1 giờ.
 - Refresh token dài hơn, ví dụ 7-30 ngày.
 - Có thể lưu refresh token hash trong DB nếu cần revoke.
 - Role nằm trong claim nhưng backend vẫn nên kiểm tra user status trong DB với request quan trọng.
 
-### 18.3. File
+### 23.3. File
 
 - Validate extension và MIME type.
 - Kiểm tra PDF có đọc được hay không.
@@ -2474,7 +3137,7 @@ Nên dùng:
 - Pre-signed URL ngắn hạn.
 - Tự động xóa file hết hạn.
 
-### 18.4. Coin/payment
+### 23.4. Coin/payment
 
 - Dùng database transaction khi cộng/trừ coin.
 - Không cho số dư coin âm.
@@ -2482,7 +3145,7 @@ Nên dùng:
 - Không trừ coin hai lần cho một conversion job.
 - Ghi audit log cho thao tác admin.
 
-### 18.5. Internal worker
+### 23.5. Internal worker
 
 - Endpoint `/internal/worker/**` không public.
 - Bắt buộc `X-Worker-Token`.
@@ -2491,9 +3154,9 @@ Nên dùng:
 
 ---
 
-## 19. Health check và monitoring
+## 24. Health check và monitoring
 
-### 19.1. Spring Boot health
+### 24.1. Spring Boot health
 
 ```http
 GET /api/v1/health
@@ -2519,7 +3182,38 @@ Có thể dùng thêm Spring Actuator:
 GET /actuator/health
 ```
 
-### 19.2. Worker health
+### 24.2. SSE cho realtime conversion status (Phase 3+)
+
+**Giai đoạn**: Phase 3 — Map: ui_des_future.md §3.1
+
+```http
+GET /api/v1/conversions/{id}/events
+```
+
+Role: Owner USER, ADMIN
+
+Response: Server-Sent Events stream.
+
+```text
+event: status
+data: {"id": 1001, "status": "PROCESSING", "progress": 45}
+
+event: status
+data: {"id": 1001, "status": "SUCCESS", "progress": 100}
+
+event: complete
+data: {"id": 1001, "status": "SUCCESS", "downloadAvailable": true}
+```
+
+Các event types:
+
+| Event | Mô tả |
+|---|---|
+| `status` | Cập nhật trạng thái/progress |
+| `complete` | Kết thúc (success/failed) |
+| `error` | Lỗi kết nối |
+
+### 24.3. Worker health
 
 ```http
 GET /api/v1/internal/worker-health
@@ -2529,7 +3223,7 @@ Hoặc worker gửi heartbeat qua endpoint internal.
 
 ---
 
-## 20. Route mapping với Next.js
+## 25. Route mapping với Next.js
 
 | Next.js route | API chính |
 |---|---|
@@ -2553,12 +3247,28 @@ Hoặc worker gửi heartbeat qua endpoint internal.
 | `/admin/tickets` | `GET /admin/tickets` |
 | `/admin/settings` | `GET/PATCH/PUT /admin/settings` |
 | `/support-dashboard/tickets` | `GET /support/tickets` |
+| `/payment/momo` | `POST /payments/momo` | Phase 2 |
+| `/payment/vnpay` | `POST /payments/vnpay` | Phase 2 |
+| `/payment/result` | `GET /payments/{id}` | Phase 2 |
+| `/subscription` | `GET /subscription/plans`, `POST /subscription` | Phase 4 |
+| `/subscription/manage` | `GET /subscription/current`, `POST /subscription/cancel` | Phase 4 |
+| `/batch-upload` | `POST /batches` | Phase 3 |
+| `/batch-processing/[id]` | `GET /batches/{id}`, `GET /batches/{id}/download` | Phase 3 |
+| `/developer/api-keys` | `GET /api-keys`, `POST /api-keys` | Phase 4 |
+| `/developer/docs` | Swagger UI embed | Phase 4 |
+| `/notifications` | `GET /notifications`, `POST /notifications/read-all` | Phase 3 |
+| `/admin/analytics` | `GET /admin/dashboard/summary` | Phase 5 |
+| `/admin/monitoring` | `GET /admin/monitoring` | Phase 5 |
+| `/admin/complaints` | `GET /admin/tickets`, `PATCH /admin/tickets/{id}` | Phase 3 |
+| `/admin/support-agents` | `POST /admin/support-agents` | Phase 3 |
+| `/admin/security/rate-limiting` | `GET/POST /admin/rate-limits` | Phase 5 |
+| `/admin/security/virus-scan` | `GET /admin/virus-scans` | Phase 5 |
 
 ---
 
-## 21. MVP API checklist
+## 26. MVP API checklist
 
-### 21.1. Cần làm trong MVP
+### 26.1. Cần làm trong MVP
 
 - Auth:
   - `POST /auth/register`
@@ -2566,13 +3276,21 @@ Hoặc worker gửi heartbeat qua endpoint internal.
   - `POST /auth/refresh`
   - `POST /auth/logout`
   - `GET /users/me`
+  - `PATCH /users/me`
+  - `POST /users/me/avatar`
+  - `PATCH /users/me/password`
 - Upload/convert:
   - `POST /uploads/pdf/preview`
+  - `DELETE /uploads/pdf/preview`
   - `POST /conversions`
   - `GET /conversions/{id}`
   - `GET /conversions/{id}/status`
   - `GET /conversions`
   - `GET /conversions/{id}/download`
+  - `GET /conversions/{id}/download-url`
+  - `POST /conversions/{id}/retry`
+  - `POST /conversions/{id}/cancel`
+  - `GET /conversions/free-usage/today`
 - Worker:
   - SQS message
   - `POST /internal/worker/conversions/{id}/started`
@@ -2581,42 +3299,72 @@ Hoặc worker gửi heartbeat qua endpoint internal.
 - Coin:
   - `GET /wallet`
   - `GET /coin-transactions`
+  - `GET /coin-transactions/{id}`
 - Payment thủ công:
   - `GET /coin-packages`
   - `POST /payments`
   - `GET /payments`
   - `GET /payments/{id}`
+  - `POST /payments/{id}/cancel`
   - `POST /admin/payments/{id}/confirm`
+  - `POST /admin/payments/{id}/fail`
+  - `POST /admin/payments/{id}/cancel`
 - Admin:
   - `GET /admin/users`
   - `PATCH /admin/users/{id}/status`
+  - `PATCH /admin/users/{id}/role`
   - `POST /admin/users/{id}/coin-adjustments`
-  - `GET/POST/PATCH /admin/coin-packages`
+  - `GET/POST/PATCH/DELETE /admin/coin-packages`
   - `GET /admin/payments`
   - `GET /admin/conversions`
+  - `GET /admin/coin-transactions`
+  - `POST /admin/conversions/{id}/delete-files`
+  - `GET /admin/tickets`
+  - `PATCH /admin/tickets/{id}/assignment`
+  - `PATCH /admin/tickets/{id}`
+  - `GET /admin/settings`
+  - `PATCH/PUT /admin/settings`
+  - `GET /admin/audit-logs`
 - Support cơ bản:
   - `POST /tickets`
   - `GET /tickets`
   - `GET /tickets/{id}`
   - `GET/POST /tickets/{id}/messages`
+  - `POST /tickets/{id}/resolve`
+  - `POST /tickets/{id}/cancel`
 
-### 21.2. Để sau MVP
+### 26.2. Để sau MVP
 
-- Payment callback thật:
-  - `POST /webhooks/momo`
-  - `POST /webhooks/vnpay`
-  - `POST /webhooks/zalopay`
-- OCR nâng cao thật.
-- Chatbot AI thật.
-- Convert nhiều file cùng lúc.
-- Gói thành viên tháng.
-- Public API cho bên thứ ba.
-- Dashboard thống kê nâng cao.
-- WebSocket/SSE cho realtime conversion status.
+**Phase 2 — Thanh toán & OCR**
+- `POST /payments/momo` + webhook callback
+- `POST /payments/vnpay` + return URL
+- `POST /payments/{id}/status` polling
+- OCR nâng cao thật
+
+**Phase 3 — Queue & Support**
+- `POST /batches`, `GET /batches/{id}/download`
+- WebSocket/SSE cho realtime conversion status
+- `GET/POST /notifications`
+- Chatbot AI thật (LLM integration)
+- `POST /admin/support-agents`
+- `PATCH /admin/tickets/{id}` workflow
+
+**Phase 4 — Subscription & API**
+- `GET /subscription/plans`, `POST /subscription`, `POST /subscription/cancel`
+- `GET/POST/DELETE /api-keys`
+- `GET/POST/PATCH/DELETE /webhooks`
+- `GET /notifications`
+
+**Phase 5 — Analytics & Security**
+- `GET /admin/monitoring`
+- Dashboard thống kê nâng cao
+- `GET/POST /admin/rate-limits`
+- `GET /admin/virus-scans`
+- Quality comparison APIs
 
 ---
 
-## 22. Gợi ý package backend Spring Boot
+## 27. Gợi ý package backend Spring Boot
 
 ```text
 com.example.pdfconverter
@@ -2641,7 +3389,7 @@ com.example.pdfconverter
 │   └── util
 ```
 
-### 22.1. Service chính
+### 27.1. Service chính
 
 | Service | Vai trò |
 |---|---|
@@ -2653,31 +3401,40 @@ com.example.pdfconverter
 | `SqsQueueService` | Gửi message cho worker |
 | `CoinService` | Cộng/trừ/hoàn/điều chỉnh coin |
 | `PaymentService` | Tạo và xác nhận payment |
+| `SubscriptionService` | Subscription plans, register, cancel | Phase 4 |
+| `BatchService` | Batch convert, ZIP download | Phase 3 |
+| `NotificationService` | In-app notifications, push | Phase 3 |
+| `ApiKeyService` | API key CRUD, rate limiting | Phase 4 |
+| `WebhookService` | Webhook CRUD, trigger events | Phase 4 |
 | `SupportTicketService` | Ticket và message |
 | `AdminService` | Admin dashboard, user, settings |
 | `WorkerCallbackService` | Xử lý callback từ Python Worker |
 
 ---
 
-## 23. Gợi ý biến môi trường
+## 28. Gợi ý biến môi trường
 
-### 23.1. Backend Spring Boot
+### 28.1. Backend Spring Boot
 
 ```env
+# App
 APP_ENV=local
 APP_BASE_URL=http://localhost:8080
 FRONTEND_BASE_URL=http://localhost:3000
 
+# Database
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=pdf_converter
 DB_USERNAME=root
 DB_PASSWORD=root
 
+# JWT
 JWT_SECRET=change_me
 JWT_ACCESS_TTL_SECONDS=3600
 JWT_REFRESH_TTL_SECONDS=604800
 
+# AWS / LocalStack
 AWS_ENDPOINT=http://localhost:4566
 AWS_REGION=ap-southeast-1
 AWS_ACCESS_KEY_ID=test
@@ -2685,15 +3442,40 @@ AWS_SECRET_ACCESS_KEY=test
 S3_BUCKET=pdf-converter
 SQS_CONVERSION_QUEUE_URL=http://localhost:4566/000000000000/pdf-conversion-jobs
 
+# Worker
 WORKER_TOKEN=change_me_worker_secret
 UPLOAD_TOKEN_SECRET=change_me_upload_secret
 
+# Limits
 FREE_MAX_FILE_SIZE_MB=5
 FREE_MAX_PAGES=30
 FREE_DAILY_LIMIT=5
+MAX_FILE_SIZE_PREMIUM_MB=50
+MAX_PAGES_PREMIUM=500
+FILE_RETENTION_ORIGINAL_DAYS=7
+
+# Rate Limit
+RATE_LIMIT_UPLOAD_PER_MINUTE=10
+RATE_LIMIT_CHATBOT_PER_MINUTE=30
+
+# Feature Flags
+VIRUS_SCAN_ENABLED=true
+OCR_ENABLED=true
+
+# Payment (Phase 2)
+MOMO_PARTNER_CODE=change_me
+MOMO_ACCESS_KEY=change_me
+MOMO_SECRET_KEY=change_me
+VNPAY_TMN_CODE=change_me
+VNPAY_HASH_SECRET=change_me
+VNPAY_RETURN_URL=http://localhost:8080/api/v1/payments/vnpay/return
+
+# Bot
+CHATBOT_LLM_API_KEY=change_me
+CHATBOT_LLM_MODEL=claude-sonnet-4
 ```
 
-### 23.2. Python Worker
+### 28.2. Python Worker
 
 ```env
 AWS_ENDPOINT=http://localstack:4566
@@ -2709,9 +3491,9 @@ WORKER_ID=worker-01
 
 ---
 
-## 24. Ví dụ flow API hoàn chỉnh
+## 29. Ví dụ flow API hoàn chỉnh
 
-### 24.1. Guest convert miễn phí
+### 29.1. Guest convert miễn phí
 
 1. Upload preview:
 
@@ -2748,7 +3530,7 @@ GET /api/v1/conversions/1001/status
 GET /api/v1/conversions/1001/download
 ```
 
-### 24.2. User convert nâng cao
+### 29.2. User convert nâng cao
 
 1. Login:
 
@@ -2791,7 +3573,7 @@ Idempotency-Key: <uuid>
 GET /api/v1/coin-transactions?type=DEDUCT
 ```
 
-### 24.3. User nạp coin thủ công
+### 29.3. User nạp coin thủ công
 
 1. Lấy gói coin:
 
@@ -2826,7 +3608,7 @@ GET /api/v1/wallet
 
 ---
 
-## 25. Ghi chú triển khai
+## 30. Ghi chú triển khai
 
 1. Frontend không được tự tính coin làm nguồn tin cuối cùng; backend phải tính lại.
 2. Frontend chỉ hiển thị `coinEstimate` từ backend.

@@ -9,7 +9,13 @@ INSERT INTO system_settings (setting_key, setting_value, data_type, description)
 ('premium_file_storage_hours', '24', 'INT', 'Thời gian lưu file nâng cao'),
 ('coin_normal_per_page', '1', 'INT', 'Coin cho convert thường mỗi trang'),
 ('coin_ocr_per_page', '2', 'INT', 'Coin cho convert OCR mỗi trang'),
-('coin_after_30_pages_per_page', '3', 'INT', 'Coin cho mỗi trang sau trang 30');
+('coin_after_30_pages_per_page', '3', 'INT', 'Coin cho mỗi trang sau trang 30'),
+('max_file_size_premium_mb', '50', 'INT', 'Dung lượng tối đa cho nâng cao'),
+('max_pages_premium', '500', 'INT', 'Số trang tối đa cho nâng cao'),
+('file_retention_original_days', '7', 'INT', 'Thời gian lưu PDF gốc (ngày)'),
+('rate_limit_upload_per_minute', '10', 'INT', 'Giới hạn upload mỗi phút'),
+('rate_limit_chatbot_per_minute', '30', 'INT', 'Giới hạn chatbot mỗi phút'),
+('virus_scan_enabled', 'true', 'BOOLEAN', 'Bật/tắt quét virus');
 
 INSERT INTO coin_packages (name, price_vnd, coin_amount, description, sort_order) VALUES
 ('Gói 1', 10000, 100, 'Gói coin cơ bản', 1),

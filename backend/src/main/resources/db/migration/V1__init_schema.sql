@@ -1,16 +1,21 @@
 -- Migration V1: tạo toàn bộ schema.
 -- Nguồn: done/TechSpec/schema.md (MySQL 8+). Thứ tự tạo bảng theo §13 để tránh lỗi FK.
 -- Lưu ý: conversion_jobs.status bổ sung 'QUEUED' để khớp api_spec.md §3.2.
+-- Map với schema.md v2.0 (đã cập nhật 2026-06-28): MVP columns + refresh_tokens.
 
 CREATE TABLE users (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     full_name VARCHAR(150) NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    avatar_url VARCHAR(500) NULL,
     role ENUM('USER', 'ADMIN', 'SUPPORT') NOT NULL DEFAULT 'USER',
     coin_balance INT UNSIGNED NOT NULL DEFAULT 0,
+    subscription_tier ENUM('FREE', 'PREMIUM', 'VIP') NOT NULL DEFAULT 'FREE',
     status ENUM('ACTIVE', 'LOCKED', 'BANNED') NOT NULL DEFAULT 'ACTIVE',
     last_login_at DATETIME NULL,
+    last_login_ip VARCHAR(45) NULL,
+    deleted_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -24,6 +29,20 @@ CREATE TABLE password_reset_tokens (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_password_reset_tokens_user
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE refresh_tokens (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    revoked_at DATETIME NULL,
+    device_info VARCHAR(255) NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_refresh_tokens_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE coin_packages (
@@ -62,6 +81,7 @@ CREATE TABLE conversion_jobs (
     user_id BIGINT UNSIGNED NULL,
     guest_token VARCHAR(100) NULL,
     source_ip VARCHAR(45) NULL,
+    source ENUM('WEB', 'API') NOT NULL DEFAULT 'WEB',
     original_file_name VARCHAR(255) NOT NULL,
     original_file_path VARCHAR(500) NOT NULL,
     output_file_name VARCHAR(255) NULL,
@@ -70,10 +90,12 @@ CREATE TABLE conversion_jobs (
     total_pages INT UNSIGNED NOT NULL,
     conversion_mode ENUM('FREE', 'PREMIUM') NOT NULL,
     processing_type ENUM('NORMAL', 'OCR') NOT NULL DEFAULT 'NORMAL',
+    conversion_settings JSON NULL,
     coin_estimated INT UNSIGNED NOT NULL DEFAULT 0,
     coin_charged INT UNSIGNED NOT NULL DEFAULT 0,
     status ENUM('PENDING', 'QUEUED', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'DELETED') NOT NULL DEFAULT 'PENDING',
     queue_priority TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    retry_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
     error_message TEXT NULL,
     started_at DATETIME NULL,
     completed_at DATETIME NULL,
@@ -165,6 +187,7 @@ CREATE TABLE chatbot_messages (
     chatbot_conversation_id BIGINT UNSIGNED NOT NULL,
     sender_role ENUM('USER', 'BOT', 'SYSTEM') NOT NULL,
     message TEXT NOT NULL,
+    metadata JSON NULL,
     rating TINYINT UNSIGNED NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_chatbot_messages_conversation FOREIGN KEY (chatbot_conversation_id) REFERENCES chatbot_conversations(id) ON DELETE CASCADE
@@ -173,7 +196,7 @@ CREATE TABLE chatbot_messages (
 CREATE TABLE system_settings (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     setting_key VARCHAR(100) NOT NULL UNIQUE,
-    setting_value VARCHAR(500) NOT NULL,
+    setting_value TEXT NOT NULL,
     data_type ENUM('STRING', 'INT', 'BOOLEAN', 'JSON') NOT NULL DEFAULT 'STRING',
     description VARCHAR(255) NULL,
     updated_by BIGINT UNSIGNED NULL,
@@ -216,4 +239,5 @@ CREATE INDEX idx_support_tickets_assigned_support_id ON support_tickets(assigned
 CREATE INDEX idx_support_tickets_status ON support_tickets(status);
 CREATE INDEX idx_support_tickets_issue_type ON support_tickets(issue_type);
 CREATE INDEX idx_support_messages_ticket_id ON support_messages(support_ticket_id);
+CREATE INDEX idx_support_messages_is_read ON support_messages(is_read);
 CREATE INDEX idx_chatbot_messages_conversation_id ON chatbot_messages(chatbot_conversation_id);

@@ -16,6 +16,7 @@ Hệ thống gồm các nhóm dữ liệu chính:
 
    - Quản lý tài khoản người dùng, admin, hỗ trợ viên.
    - Quản lý trạng thái tài khoản và số dư coin.
+   - JWT refresh token cho xác thực phiên.
 2. **Convert PDF sang Word**
 
    - Lưu thông tin file upload.
@@ -27,11 +28,13 @@ Hệ thống gồm các nhóm dữ liệu chính:
 
    - Quản lý số dư coin.
    - Lưu lịch sử cộng coin, trừ coin, hoàn coin, điều chỉnh coin thủ công.
-4. **Nạp tiền mua coin**
+4. **Nạp tiền mua coin & Subscription**
 
    - Quản lý gói coin.
    - Lưu lịch sử thanh toán.
    - Cộng coin khi thanh toán thành công.
+   - Quản lý gói thành viên (subscription) theo tuần/tháng/năm.
+   - Lưu subscription của người dùng.
 5. **Giới hạn convert miễn phí**
 
    - Kiểm soát số lần convert miễn phí mỗi ngày.
@@ -41,10 +44,23 @@ Hệ thống gồm các nhóm dữ liệu chính:
    - Lưu hội thoại chatbot.
    - Lưu khiếu nại của người dùng.
    - Lưu tin nhắn giữa người dùng và hỗ trợ viên.
-7. **Cấu hình hệ thống**
+7. **Cấu hình hệ thống & Audit**
 
    - Lưu các giới hạn như dung lượng file miễn phí, số trang miễn phí, số lần miễn phí mỗi ngày.
    - Lưu cấu hình giá coin cho từng loại convert.
+   - Lưu nhật ký thao tác admin/support.
+8. **Batch & API (Nâng cao)**
+
+   - Lưu thông tin batch convert nhiều file.
+   - Lưu API key cho tích hợp bên thứ ba.
+   - Lưu webhook notification.
+9. **Notification & Email (Nâng cao)**
+
+   - Lưu thông báo trong hệ thống (notification center).
+   - Lưu log gửi email.
+10. **Bảo mật (Nâng cao)**
+
+    - Lưu log quét virus cho file upload.
 
 ---
 
@@ -70,37 +86,62 @@ erDiagram
     users ||--o{ coin_transactions : owns
     users ||--o{ support_tickets : submits
     users ||--o{ chatbot_conversations : starts
+    users ||--o{ user_subscriptions : has
+    users ||--o{ batch_jobs : creates
+    users ||--o{ api_keys : owns
+    users ||--o{ notifications : receives
+    users ||--o{ refresh_tokens : has
 
     coin_packages ||--o{ payments : selected_in
+    subscription_plans ||--o{ user_subscriptions : defines
+
     payments ||--o{ coin_transactions : generates
+    payments ||--o{ user_subscriptions : pays_for
+
     conversion_jobs ||--o{ coin_transactions : charges_or_refunds
+    conversion_jobs ||--o{ batch_jobs : belongs_to
+    conversion_jobs ||--o{ virus_scans : scanned_in
 
     support_tickets ||--o{ support_messages : contains
     conversion_jobs ||--o{ support_tickets : related_to
     payments ||--o{ support_tickets : related_to
 
     chatbot_conversations ||--o{ chatbot_messages : contains
+
+    batch_jobs ||--o{ conversion_jobs : contains
+    user_subscriptions ||--o{ payments : generates
+
+    users ||--o{ email_logs : receives
 ```
 
 ---
 
 ## 4. Danh sách bảng đề xuất
 
-| STT | Tên bảng                 | Mục đích                                                            |
-| --: | -------------------------- | ---------------------------------------------------------------------- |
-|   1 | `users`                  | Lưu tài khoản người dùng, admin, hỗ trợ viên và số dư coin |
-|   2 | `password_reset_tokens`  | Lưu token quên mật khẩu                                            |
-|   3 | `coin_packages`          | Lưu các gói coin người dùng có thể mua                         |
-|   4 | `payments`               | Lưu giao dịch nạp tiền mua coin                                    |
-|   5 | `conversion_jobs`        | Lưu thông tin file PDF, file DOCX và trạng thái convert           |
-|   6 | `coin_transactions`      | Lưu lịch sử cộng, trừ, hoàn và điều chỉnh coin               |
-|   7 | `free_conversion_usages` | Lưu số lần convert miễn phí theo ngày                            |
-|   8 | `support_tickets`        | Lưu yêu cầu hỗ trợ hoặc khiếu nại                              |
-|   9 | `support_messages`       | Lưu tin nhắn trong từng yêu cầu hỗ trợ                          |
-|  10 | `chatbot_conversations`  | Lưu phiên hội thoại chatbot AI                                     |
-|  11 | `chatbot_messages`       | Lưu nội dung hỏi đáp với chatbot AI                              |
-|  12 | `system_settings`        | Lưu cấu hình hệ thống                                             |
-|  13 | `admin_audit_logs`       | Lưu lịch sử thao tác quan trọng của admin/support                |
+| STT | Tên bảng                 | Mục đích                                                            | Giai đoạn |
+| --: | -------------------------- | ---------------------------------------------------------------------- | --------- |
+|   1 | `users`                  | Lưu tài khoản người dùng, admin, hỗ trợ viên và số dư coin | MVP       |
+|   2 | `refresh_tokens`         | Lưu JWT refresh token cho phiên đăng nhập                        | MVP       |
+|   3 | `password_reset_tokens`  | Lưu token quên mật khẩu                                            | MVP       |
+|   4 | `coin_packages`          | Lưu các gói coin người dùng có thể mua                         | MVP       |
+|   5 | `payments`               | Lưu giao dịch nạp tiền mua coin                                    | MVP       |
+|   6 | `conversion_jobs`        | Lưu thông tin file PDF, file DOCX và trạng thái convert           | MVP       |
+|   7 | `coin_transactions`      | Lưu lịch sử cộng, trừ, hoàn và điều chỉnh coin               | MVP       |
+|   8 | `free_conversion_usages` | Lưu số lần convert miễn phí theo ngày                            | MVP       |
+|   9 | `support_tickets`        | Lưu yêu cầu hỗ trợ hoặc khiếu nại                              | MVP       |
+|  10 | `support_messages`       | Lưu tin nhắn trong từng yêu cầu hỗ trợ                          | MVP       |
+|  11 | `chatbot_conversations`  | Lưu phiên hội thoại chatbot AI                                     | Phase 3   |
+|  12 | `chatbot_messages`       | Lưu nội dung hỏi đáp với chatbot AI                              | Phase 3   |
+|  13 | `system_settings`        | Lưu cấu hình hệ thống                                             | MVP       |
+|  14 | `admin_audit_logs`       | Lưu lịch sử thao tác quan trọng của admin/support                | MVP       |
+|  15 | `subscription_plans`     | Lưu các gói thành viên (tuần/tháng/năm)                         | Phase 4   |
+|  16 | `user_subscriptions`     | Lưu subscription của người dùng                                   | Phase 4   |
+|  17 | `batch_jobs`             | Lưu thông tin batch convert nhiều file                            | Phase 3   |
+|  18 | `api_keys`               | Lưu API key cho tích hợp bên thứ ba                              | Phase 4   |
+|  19 | `webhooks`               | Lưu webhook notification                                          | Phase 4   |
+|  20 | `notifications`          | Lưu thông báo trong hệ thống                                       | Phase 3   |
+|  21 | `email_logs`             | Lưu log gửi email                                                  | Phase 4   |
+|  22 | `virus_scans`            | Lưu log quét virus cho file upload                                | Phase 5   |
 
 ---
 
@@ -122,24 +163,30 @@ Lưu thông tin tài khoản người dùng, admin và hỗ trợ viên.
 
 ### Cấu trúc bảng
 
-| Cột              | Kiểu dữ liệu | Ràng buộc         | Mô tả                            |
-| ----------------- | --------------- | ------------------- | ---------------------------------- |
-| `id`            | BIGINT UNSIGNED | PK, AUTO_INCREMENT  | ID người dùng                   |
-| `full_name`     | VARCHAR(150)    | NULL                | Họ tên                           |
-| `email`         | VARCHAR(255)    | NOT NULL, UNIQUE    | Email đăng nhập                 |
-| `password_hash` | VARCHAR(255)    | NOT NULL            | Mật khẩu đã mã hóa           |
-| `role`          | ENUM            | NOT NULL            | `USER`, `ADMIN`, `SUPPORT`   |
-| `coin_balance`  | INT UNSIGNED    | NOT NULL, DEFAULT 0 | Số dư coin hiện tại            |
-| `status`        | ENUM            | NOT NULL            | `ACTIVE`, `LOCKED`, `BANNED` |
-| `last_login_at` | DATETIME        | NULL                | Lần đăng nhập gần nhất       |
-| `created_at`    | DATETIME        | NOT NULL            | Ngày tạo                         |
-| `updated_at`    | DATETIME        | NOT NULL            | Ngày cập nhật                   |
+| Cột                   | Kiểu dữ liệu | Ràng buộc                 | Mô tả                                  |
+| ---------------------- | --------------- | --------------------------- | ------------------------------------------ |
+| `id`                 | BIGINT UNSIGNED | PK, AUTO_INCREMENT          | ID người dùng                           |
+| `full_name`          | VARCHAR(150)    | NULL                        | Họ tên                                   |
+| `email`              | VARCHAR(255)    | NOT NULL, UNIQUE            | Email đăng nhập                         |
+| `password_hash`      | VARCHAR(255)    | NOT NULL                    | Mật khẩu đã mã hóa                   |
+| `avatar_url`         | VARCHAR(500)    | NULL                        | Đường dẫn ảnh đại diện               |
+| `role`               | ENUM            | NOT NULL, DEFAULT 'USER'    | `USER`, `ADMIN`, `SUPPORT`           |
+| `coin_balance`       | INT UNSIGNED    | NOT NULL, DEFAULT 0         | Số dư coin hiện tại                    |
+| `subscription_tier`  | ENUM            | NOT NULL, DEFAULT 'FREE'    | `FREE`, `PREMIUM`, `VIP`              |
+| `status`             | ENUM            | NOT NULL, DEFAULT 'ACTIVE'  | `ACTIVE`, `LOCKED`, `BANNED`         |
+| `last_login_at`      | DATETIME        | NULL                        | Lần đăng nhập gần nhất               |
+| `last_login_ip`      | VARCHAR(45)     | NULL                        | IP đăng nhập gần nhất                |
+| `deleted_at`         | DATETIME        | NULL                        | Thời gian xóa mềm                    |
+| `created_at`         | DATETIME        | NOT NULL                    | Ngày tạo                                 |
+| `updated_at`         | DATETIME        | NOT NULL                    | Ngày cập nhật                           |
 
 ### Ghi chú
 
 - `coin_balance` được lưu trực tiếp để đọc nhanh.
 - Mọi thay đổi coin vẫn phải được ghi vào bảng `coin_transactions`.
 - Khi cộng/trừ coin, nên dùng database transaction để tránh sai lệch số dư.
+- `subscription_tier` là cache để đọc nhanh, dữ liệu gốc ở bảng `user_subscriptions`.
+- `deleted_at` phục vụ GDPR/compliance — user có thể yêu cầu xóa tài khoản.
 
 ---
 
@@ -163,7 +210,30 @@ Lưu token phục vụ chức năng quên mật khẩu.
 
 ---
 
-## 5.3. Bảng `coin_packages`
+## 5.3. Bảng `refresh_tokens`
+
+Lưu JWT refresh token để duy trì phiên đăng nhập.
+
+### Chức năng liên quan
+
+- Đăng nhập và duy trì phiên.
+- Rotate refresh token.
+- Thu hồi token khi đăng xuất.
+
+| Cột              | Kiểu dữ liệu | Ràng buộc        | Mô tả                            |
+| ----------------- | --------------- | ------------------ | ---------------------------------- |
+| `id`            | BIGINT UNSIGNED | PK, AUTO_INCREMENT | ID token                          |
+| `user_id`       | BIGINT UNSIGNED | FK, NOT NULL       | Người dùng sở hữu              |
+| `token_hash`    | VARCHAR(255)    | NOT NULL           | Refresh token đã hash           |
+| `expires_at`    | DATETIME        | NOT NULL           | Thời gian hết hạn (7 ngày)      |
+| `revoked_at`    | DATETIME        | NULL               | Thời gian thu hồi               |
+| `device_info`   | VARCHAR(255)    | NULL               | User-Agent                          |
+| `ip_address`    | VARCHAR(45)     | NULL               | IP đăng nhập                      |
+| `created_at`    | DATETIME        | NOT NULL           | Ngày tạo                           |
+
+---
+
+## 5.4. Bảng `coin_packages`
 
 Lưu các gói coin để người dùng chọn khi nạp tiền.
 
@@ -195,7 +265,7 @@ Lưu các gói coin để người dùng chọn khi nạp tiền.
 
 ---
 
-## 5.4. Bảng `payments`
+## 5.5. Bảng `payments`
 
 Lưu lịch sử nạp tiền mua coin.
 
@@ -211,6 +281,7 @@ Lưu lịch sử nạp tiền mua coin.
 | `id`                        | BIGINT UNSIGNED | PK, AUTO_INCREMENT | ID thanh toán                                                  |
 | `user_id`                   | BIGINT UNSIGNED | FK, NOT NULL       | Người dùng nạp tiền                                        |
 | `coin_package_id`           | BIGINT UNSIGNED | FK, NULL           | Gói coin được chọn                                         |
+| `subscription_id`           | BIGINT UNSIGNED | FK, NULL           | Đăng ký subscription liên quan (nếu có)                |
 | `amount_vnd`                | INT UNSIGNED    | NOT NULL           | Số tiền thanh toán                                           |
 | `coin_amount`               | INT UNSIGNED    | NOT NULL           | Số coin được cộng nếu thành công                        |
 | `payment_method`            | ENUM            | NOT NULL           | `MANUAL`, `BANK_TRANSFER`, `MOMO`, `VNPAY`, `ZALOPAY` |
@@ -229,7 +300,7 @@ Lưu lịch sử nạp tiền mua coin.
 
 ---
 
-## 5.5. Bảng `conversion_jobs`
+## 5.6. Bảng `conversion_jobs`
 
 Lưu thông tin mỗi lần người dùng convert PDF sang DOCX.
 
@@ -251,6 +322,7 @@ Lưu thông tin mỗi lần người dùng convert PDF sang DOCX.
 | `user_id`            | BIGINT UNSIGNED  | FK, NULL            | Người dùng convert, NULL nếu là khách                                    |
 | `guest_token`        | VARCHAR(100)     | NULL                | Mã định danh khách chưa đăng nhập                                      |
 | `source_ip`          | VARCHAR(45)      | NULL                | IP người dùng                                                               |
+| `source`             | ENUM             | NOT NULL, DEFAULT 'WEB' | `WEB`, `API` — phân biệt web vs API                              |
 | `original_file_name` | VARCHAR(255)     | NOT NULL            | Tên file PDF gốc                                                             |
 | `original_file_path` | VARCHAR(500)     | NOT NULL            | Đường dẫn lưu file PDF                                                    |
 | `output_file_name`   | VARCHAR(255)     | NULL                | Tên file DOCX kết quả                                                       |
@@ -259,10 +331,13 @@ Lưu thông tin mỗi lần người dùng convert PDF sang DOCX.
 | `total_pages`        | INT UNSIGNED     | NOT NULL            | Số trang PDF                                                                  |
 | `conversion_mode`    | ENUM             | NOT NULL            | `FREE`, `PREMIUM`                                                          |
 | `processing_type`    | ENUM             | NOT NULL            | `NORMAL`, `OCR`                                                            |
+| `conversion_settings`| JSON             | NULL                | Cấu hình chuyển đổi (giữ bảng, font, image quality...)          |
+| `batch_job_id`       | BIGINT UNSIGNED  | FK, NULL            | Batch job chứa lần convert này (nếu có)                           |
 | `coin_estimated`     | INT UNSIGNED     | NOT NULL, DEFAULT 0 | Coin dự kiến                                                                 |
 | `coin_charged`       | INT UNSIGNED     | NOT NULL, DEFAULT 0 | Coin thực tế đã trừ                                                       |
-| `status`             | ENUM             | NOT NULL            | `PENDING`, `PROCESSING`, `SUCCESS`, `FAILED`, `EXPIRED`, `DELETED` |
+| `status`             | ENUM             | NOT NULL            | `PENDING`, `QUEUED`, `PROCESSING`, `SUCCESS`, `FAILED`, `EXPIRED`, `DELETED` |
 | `queue_priority`     | TINYINT UNSIGNED | NOT NULL, DEFAULT 5 | Độ ưu tiên xử lý, số nhỏ ưu tiên cao hơn                            |
+| `retry_count`        | TINYINT UNSIGNED | NOT NULL, DEFAULT 0 | Số lần đã retry                                                             |
 | `error_message`      | TEXT             | NULL                | Thông báo lỗi nếu thất bại                                               |
 | `started_at`         | DATETIME         | NULL                | Thời điểm bắt đầu xử lý                                                |
 | `completed_at`       | DATETIME         | NULL                | Thời điểm hoàn tất                                                        |
@@ -291,7 +366,7 @@ Lưu thông tin mỗi lần người dùng convert PDF sang DOCX.
 
 ---
 
-## 5.6. Bảng `coin_transactions`
+## 5.7. Bảng `coin_transactions`
 
 Lưu toàn bộ lịch sử biến động coin.
 
@@ -329,7 +404,7 @@ Lưu toàn bộ lịch sử biến động coin.
 
 ---
 
-## 5.7. Bảng `free_conversion_usages`
+## 5.8. Bảng `free_conversion_usages`
 
 Lưu số lần convert miễn phí trong ngày.
 
@@ -358,7 +433,7 @@ Lưu số lần convert miễn phí trong ngày.
 
 ---
 
-## 5.8. Bảng `support_tickets`
+## 5.9. Bảng `support_tickets`
 
 Lưu yêu cầu hỗ trợ hoặc khiếu nại của người dùng.
 
@@ -393,7 +468,7 @@ Lưu yêu cầu hỗ trợ hoặc khiếu nại của người dùng.
 
 ---
 
-## 5.9. Bảng `support_messages`
+## 5.10. Bảng `support_messages`
 
 Lưu tin nhắn trong từng cuộc hỗ trợ/khiếu nại.
 
@@ -410,7 +485,7 @@ Lưu tin nhắn trong từng cuộc hỗ trợ/khiếu nại.
 
 ---
 
-## 5.10. Bảng `chatbot_conversations`
+## 5.11. Bảng `chatbot_conversations`
 
 Lưu phiên hội thoại chatbot AI.
 
@@ -430,7 +505,7 @@ Lưu phiên hội thoại chatbot AI.
 
 ---
 
-## 5.11. Bảng `chatbot_messages`
+## 5.12. Bảng `chatbot_messages`
 
 Lưu từng câu hỏi và câu trả lời trong chatbot.
 
@@ -440,12 +515,13 @@ Lưu từng câu hỏi và câu trả lời trong chatbot.
 | `chatbot_conversation_id` | BIGINT UNSIGNED  | FK, NOT NULL       | Phiên chat                             |
 | `sender_role`             | ENUM             | NOT NULL           | `USER`, `BOT`, `SYSTEM`           |
 | `message`                 | TEXT             | NOT NULL           | Nội dung                               |
+| `metadata`                | JSON             | NULL               | Context cho LLM (intent, entities...) |
 | `rating`                  | TINYINT UNSIGNED | NULL               | Đánh giá câu trả lời, ví dụ 1-5 |
 | `created_at`              | DATETIME         | NOT NULL           | Thời gian gửi                         |
 
 ---
 
-## 5.12. Bảng `system_settings`
+## 5.14. Bảng `system_settings`
 
 Lưu cấu hình hệ thống để admin có thể thay đổi mà không cần sửa code.
 
@@ -468,7 +544,7 @@ Lưu cấu hình hệ thống để admin có thể thay đổi mà không cần
 | ----------------- | --------------- | ------------------ | ------------------------------------------ |
 | `id`            | BIGINT UNSIGNED | PK, AUTO_INCREMENT | ID cấu hình                              |
 | `setting_key`   | VARCHAR(100)    | NOT NULL, UNIQUE   | Tên cấu hình                            |
-| `setting_value` | VARCHAR(500)    | NOT NULL           | Giá trị cấu hình                       |
+| `setting_value` | TEXT            | NOT NULL           | Giá trị cấu hình                       |
 | `data_type`     | ENUM            | NOT NULL           | `STRING`, `INT`, `BOOLEAN`, `JSON` |
 | `description`   | VARCHAR(255)    | NULL               | Mô tả                                    |
 | `updated_by`    | BIGINT UNSIGNED | FK, NULL           | Admin cập nhật                           |
@@ -477,7 +553,7 @@ Lưu cấu hình hệ thống để admin có thể thay đổi mà không cần
 
 ---
 
-## 5.13. Bảng `admin_audit_logs`
+## 5.14. Bảng `admin_audit_logs`
 
 Lưu lịch sử thao tác quan trọng của admin hoặc hỗ trợ viên.
 
@@ -502,6 +578,238 @@ Lưu lịch sử thao tác quan trọng của admin hoặc hỗ trợ viên.
 
 ---
 
+## 5.15. Bảng `subscription_plans`
+
+> **Giai đoạn**: Phase 4 — Gói thành viên (task_future.md §5.2)
+
+Lưu các gói thành viên subscription (tuần/tháng/năm).
+
+### Chức năng liên quan
+
+- Hiển thị các gói subscription.
+- Admin quản lý gói.
+- Người dùng đăng ký gói.
+
+| Cột              | Kiểu dữ liệu | Ràng buộc                    | Mô tả                                              |
+| ----------------- | --------------- | ------------------------------ | ---------------------------------------------------- |
+| `id`            | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | ID gói                                              |
+| `name`          | VARCHAR(100)    | NOT NULL                       | Tên gói: "Gói Tuần", "Gói Tháng"...               |
+| `price_vnd`    | INT UNSIGNED    | NOT NULL                       | Giá VNĐ                                             |
+| `duration_days` | INT UNSIGNED    | NOT NULL                       | Số ngày: 7, 30, 365                                 |
+| `coin_bonus`   | INT UNSIGNED    | NOT NULL, DEFAULT 0            | Coin tặng kèm mỗi kỳ                                |
+| `priority_level` | TINYINT UNSIGNED | NOT NULL, DEFAULT 5            | Mức ưu tiên queue (số nhỏ = cao hơn)               |
+| `max_file_size_mb` | INT UNSIGNED    | NULL                           | Giới hạn file (NULL = không giới hạn)              |
+| `ocr_included`    | BOOLEAN         | NOT NULL, DEFAULT FALSE        | OCR miễn phí                                        |
+| `features`      | JSON            | NULL                           | Mô tả chi tiết các lợi ích                           |
+| `is_active`    | BOOLEAN         | NOT NULL, DEFAULT TRUE         | Còn bán hay không                                   |
+| `sort_order`   | INT             | NOT NULL, DEFAULT 0            | Thứ tự hiển thị                                     |
+| `created_at`   | DATETIME        | NOT NULL                       | Ngày tạo                                            |
+| `updated_at`   | DATETIME        | NOT NULL                       | Ngày cập nhật                                       |
+
+---
+
+## 5.16. Bảng `user_subscriptions`
+
+> **Giai đoạn**: Phase 4 — Subscription của người dùng (task_future.md §5.2, ui_des_future.md §5.3)
+
+Lưu thông tin subscription của từng người dùng.
+
+### Chức năng liên quan
+
+- Quản lý gói đã đăng ký.
+- Kiểm tra quyền ưu tiên.
+- Tự động gia hạn.
+
+| Cột              | Kiểu dữ liệu | Ràng buộc                    | Mô tả                                              |
+| ----------------- | --------------- | ------------------------------ | ---------------------------------------------------- |
+| `id`            | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | ID bản ghi                                          |
+| `user_id`       | BIGINT UNSIGNED | FK → users.id, NOT NULL        | Người dùng                                          |
+| `plan_id`       | BIGINT UNSIGNED | FK → subscription_plans.id, NOT NULL | Gói subscription                              |
+| `start_at`      | DATETIME        | NOT NULL                       | Ngày bắt đầu                                        |
+| `end_at`        | DATETIME        | NOT NULL                       | Ngày hết hạn                                        |
+| `auto_renew`    | BOOLEAN         | NOT NULL, DEFAULT TRUE         | Tự động gia hạn                                     |
+| `is_trial`      | BOOLEAN         | NOT NULL, DEFAULT FALSE        | Dùng thử miễn phí                                   |
+| `payment_id`    | BIGINT UNSIGNED | FK → payments.id, NULL         | Thanh toán khởi tạo (NULL nếu trial)               |
+| `status`        | ENUM            | NOT NULL                       | `ACTIVE`, `EXPIRED`, `CANCELED`, `TRIAL`          |
+| `canceled_at`  | DATETIME        | NULL                           | Thời điểm hủy                                       |
+| `created_at`   | DATETIME        | NOT NULL                       | Ngày tạo                                            |
+| `updated_at`   | DATETIME        | NOT NULL                       | Ngày cập nhật                                       |
+
+### Ghi chú
+
+- Khi subscription active, cập nhật `users.subscription_tier` tương ứng.
+- Khi subscription hết hạn, đặt lại `users.subscription_tier = 'FREE'`.
+
+---
+
+## 5.17. Bảng `batch_jobs`
+
+> **Giai đoạn**: Phase 3 — Convert hàng loạt (task_future.md §5.1, ui_des_future.md §5.1-5.2)
+
+Lưu thông tin batch convert nhiều file cùng lúc.
+
+### Chức năng liên quan
+
+- Upload và convert nhiều file.
+- Download batch dạng ZIP.
+- Theo dõi tiến trình batch.
+
+| Cột                | Kiểu dữ liệu | Ràng buộc                    | Mô tả                                              |
+| ------------------- | --------------- | ------------------------------ | ---------------------------------------------------- |
+| `id`              | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | ID batch                                            |
+| `batch_code`      | VARCHAR(64)     | NOT NULL, UNIQUE               | Mã batch                                            |
+| `user_id`         | BIGINT UNSIGNED | FK → users.id, NOT NULL        | Người dùng tạo batch                                |
+| `total_files`     | INT UNSIGNED    | NOT NULL, DEFAULT 0            | Tổng số file                                        |
+| `completed_files` | INT UNSIGNED    | NOT NULL, DEFAULT 0            | Số file hoàn tất                                    |
+| `failed_files`    | INT UNSIGNED    | NOT NULL, DEFAULT 0            | Số file lỗi                                         |
+| `status`          | ENUM            | NOT NULL                       | `PROCESSING`, `COMPLETED`, `PARTIAL_SUCCESS`, `FAILED` |
+| `zip_path`        | VARCHAR(500)    | NULL                           | Đường dẫn file ZIP kết quả                          |
+| `zip_size_bytes`  | BIGINT UNSIGNED | NULL                           | Dung lượng file ZIP                                 |
+| `zip_expired_at`  | DATETIME        | NULL                           | Thời gian hết hạn file ZIP                          |
+| `created_at`      | DATETIME        | NOT NULL                       | Ngày tạo                                            |
+| `updated_at`      | DATETIME        | NOT NULL                       | Ngày cập nhật                                       |
+
+### Ghi chú
+
+- `conversion_jobs` có `batch_job_id` FK trỏ về bảng này.
+- File ZIP được tạo khi tất cả file trong batch hoàn tất.
+
+---
+
+## 5.18. Bảng `api_keys`
+
+> **Giai đoạn**: Phase 4 — API cho bên thứ ba (task_future.md §5.3, ui_des_future.md §5.4)
+
+Lưu API key cho tích hợp bên thứ ba.
+
+### Chức năng liên quan
+
+- Quản lý API key của developer.
+- Rate limiting theo key.
+- Thống kê usage.
+
+| Cột              | Kiểu dữ liệu | Ràng buộc                    | Mô tả                                              |
+| ----------------- | --------------- | ------------------------------ | ---------------------------------------------------- |
+| `id`            | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | ID key                                              |
+| `user_id`       | BIGINT UNSIGNED | FK → users.id, NOT NULL        | Chủ sở hữu key                                     |
+| `key_hash`      | VARCHAR(255)    | NOT NULL                       | API key đã hash                                     |
+| `prefix`        | VARCHAR(20)     | NOT NULL                       | Prefix hiển thị: `cvpdf_live_abc...`               |
+| `name`          | VARCHAR(100)    | NOT NULL                       | Tên key                                             |
+| `rate_limit`    | INT UNSIGNED    | NOT NULL, DEFAULT 100          | Số request/phút                                     |
+| `status`        | ENUM            | NOT NULL                       | `ACTIVE`, `DISABLED`, `REVOKED`                   |
+| `last_used_at`  | DATETIME        | NULL                           | Lần dùng gần nhất                                   |
+| `expires_at`    | DATETIME        | NULL                           | NULL = không hết hạn                                |
+| `created_at`    | DATETIME        | NOT NULL                       | Ngày tạo                                            |
+| `updated_at`    | DATETIME        | NOT NULL                       | Ngày cập nhật                                       |
+
+### Ghi chú
+
+- Không lưu key plain text, chỉ lưu hash.
+- Prefix giúp user nhận diện key trong danh sách.
+
+---
+
+## 5.19. Bảng `webhooks`
+
+> **Giai đoạn**: Phase 4 — Webhook notification (task_future.md §5.3, ui_des_future.md §5.5)
+
+Lưu webhook URL để gửi notification khi convert hoàn tất.
+
+### Chức năng liên quan
+
+- Nhận webhook khi convert completed/failed.
+- HMAC signature verification.
+
+| Cột                  | Kiểu dữ liệu | Ràng buộc                    | Mô tả                                              |
+| --------------------- | --------------- | ------------------------------ | ---------------------------------------------------- |
+| `id`                | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | ID webhook                                          |
+| `user_id`           | BIGINT UNSIGNED | FK → users.id, NOT NULL        | Chủ sở hữu webhook                                  |
+| `url`               | VARCHAR(500)    | NOT NULL                       | Endpoint URL                                        |
+| `secret`            | VARCHAR(255)    | NOT NULL                       | HMAC secret để verify                               |
+| `events`            | JSON            | NOT NULL                       | Danh sách event: `["convert.completed", "convert.failed"]` |
+| `status`            | ENUM            | NOT NULL                       | `ACTIVE`, `DISABLED`                               |
+| `last_triggered_at` | DATETIME        | NULL                           | Lần trigger gần nhất                                |
+| `last_http_status`  | SMALLINT        | NULL                           | HTTP status lần trigger cuối                        |
+| `created_at`        | DATETIME        | NOT NULL                       | Ngày tạo                                            |
+| `updated_at`        | DATETIME        | NOT NULL                       | Ngày cập nhật                                       |
+
+---
+
+## 5.20. Bảng `notifications`
+
+> **Giai đoạn**: Phase 3 — Trung tâm thông báo (ui_des_future.md §5.7)
+
+Lưu thông báo trong hệ thống cho người dùng.
+
+### Chức năng liên quan
+
+- Hiển thị notification bell + badge.
+- Push notification real-time.
+
+| Cột              | Kiểu dữ liệu | Ràng buộc                    | Mô tả                                              |
+| ----------------- | --------------- | ------------------------------ | ---------------------------------------------------- |
+| `id`            | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | ID thông báo                                        |
+| `user_id`       | BIGINT UNSIGNED | FK → users.id, NOT NULL        | Người nhận                                          |
+| `type`          | VARCHAR(50)     | NOT NULL                       | `CONVERT_DONE`, `COIN_ADDED`, `SYSTEM`, `PROMOTION` |
+| `title`         | VARCHAR(255)    | NOT NULL                       | Tiêu đề                                             |
+| `content`       | TEXT            | NULL                           | Nội dung                                            |
+| `data`          | JSON            | NULL                           | Dữ liệu liên quan (result_id, payment_id...)        |
+| `action_url`    | VARCHAR(500)    | NULL                           | Link chuyển hướng khi click                         |
+| `is_read`       | BOOLEAN         | NOT NULL, DEFAULT FALSE        | Đã đọc                                              |
+| `read_at`       | DATETIME        | NULL                           | Thời điểm đọc                                       |
+| `email_sent_at` | DATETIME        | NULL                           | Thời điểm gửi email (nếu có)                       |
+| `created_at`    | DATETIME        | NOT NULL                       | Ngày tạo                                            |
+
+---
+
+## 5.21. Bảng `email_logs`
+
+> **Giai đoạn**: Phase 4 — Log gửi email (task_future.md §5.5, tech_arch.md §3.5)
+
+Lưu log gửi email qua AWS SES.
+
+### Chức năng liên quan
+
+- Theo dõi email gửi đi.
+- Xử lý email bị bounce.
+
+| Cột              | Kiểu dữ liệu | Ràng buộc                    | Mô tả                                              |
+| ----------------- | --------------- | ------------------------------ | ---------------------------------------------------- |
+| `id`            | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | ID log                                              |
+| `user_id`       | BIGINT UNSIGNED | FK → users.id, NULL            | Người nhận (NULL nếu anonymous)                    |
+| `to_email`      | VARCHAR(255)    | NOT NULL                       | Địa chỉ email nhận                                  |
+| `subject`       | VARCHAR(255)    | NOT NULL                       | Tiêu đề                                             |
+| `body`          | TEXT            | NOT NULL                       | Nội dung email                                      |
+| `email_type`    | VARCHAR(50)     | NOT NULL                       | `REGISTER`, `RESET_PASSWORD`, `CONVERT_DONE`, `COIN_ADDED`, `SUBSCRIPTION` |
+| `status`        | ENUM            | NOT NULL, DEFAULT 'SENT'       | `SENT`, `FAILED`, `BOUNCED`, `OPENED`             |
+| `error_message` | TEXT            | NULL                           | Lỗi nếu gửi thất bại                                |
+| `sent_at`       | DATETIME        | NOT NULL                       | Thời gian gửi                                       |
+| `opened_at`     | DATETIME        | NULL                           | Thời gian mở email                                  |
+
+---
+
+## 5.22. Bảng `virus_scans`
+
+> **Giai đoạn**: Phase 5 — Quét virus (task_future.md §7.2, ui_des_future.md §7.2)
+
+Lưu log quét virus cho file upload.
+
+### Chức năng liên quan
+
+- Quét file PDF trước khi lưu.
+- Thông báo user nếu phát hiện virus.
+
+| Cột                  | Kiểu dữ liệu | Ràng buộc                    | Mô tả                                              |
+| --------------------- | --------------- | ------------------------------ | ---------------------------------------------------- |
+| `id`                | BIGINT UNSIGNED | PK, AUTO_INCREMENT             | ID log                                              |
+| `conversion_job_id` | BIGINT UNSIGNED | FK → conversion_jobs.id, NOT NULL | File được quét                                |
+| `scanner`           | VARCHAR(100)    | NOT NULL                       | `ClamAV`, `AWS Textract`                           |
+| `status`            | ENUM            | NOT NULL                       | `CLEAN`, `INFECTED`, `ERROR`, `SKIPPED`          |
+| `result`            | TEXT            | NULL                           | Chi tiết kết quả quét                               |
+| `scanned_at`        | DATETIME        | NOT NULL                       | Thời điểm quét                                      |
+
+---
+
 # 6. SQL DDL tham khảo
 
 > Lưu ý: DDL này dùng cho MySQL 8+. Có thể điều chỉnh enum, index hoặc kiểu dữ liệu theo framework/backend bạn dùng.
@@ -512,10 +820,14 @@ CREATE TABLE users (
     full_name VARCHAR(150) NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    avatar_url VARCHAR(500) NULL,
     role ENUM('USER', 'ADMIN', 'SUPPORT') NOT NULL DEFAULT 'USER',
     coin_balance INT UNSIGNED NOT NULL DEFAULT 0,
+    subscription_tier ENUM('FREE', 'PREMIUM', 'VIP') NOT NULL DEFAULT 'FREE',
     status ENUM('ACTIVE', 'LOCKED', 'BANNED') NOT NULL DEFAULT 'ACTIVE',
     last_login_at DATETIME NULL,
+    last_login_ip VARCHAR(45) NULL,
+    deleted_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -528,6 +840,20 @@ CREATE TABLE password_reset_tokens (
     used_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_password_reset_tokens_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE refresh_tokens (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    revoked_at DATETIME NULL,
+    device_info VARCHAR(255) NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_refresh_tokens_user
         FOREIGN KEY (user_id) REFERENCES users(id)
         ON DELETE CASCADE
 );
@@ -548,6 +874,7 @@ CREATE TABLE payments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT UNSIGNED NOT NULL,
     coin_package_id BIGINT UNSIGNED NULL,
+    subscription_id BIGINT UNSIGNED NULL,
     amount_vnd INT UNSIGNED NOT NULL,
     coin_amount INT UNSIGNED NOT NULL,
     payment_method ENUM('MANUAL', 'BANK_TRANSFER', 'MOMO', 'VNPAY', 'ZALOPAY') NOT NULL DEFAULT 'MANUAL',
@@ -561,7 +888,10 @@ CREATE TABLE payments (
     CONSTRAINT fk_payments_user
         FOREIGN KEY (user_id) REFERENCES users(id),
     CONSTRAINT fk_payments_coin_package
-        FOREIGN KEY (coin_package_id) REFERENCES coin_packages(id)
+        FOREIGN KEY (coin_package_id) REFERENCES coin_packages(id),
+    CONSTRAINT fk_payments_subscription
+        FOREIGN KEY (subscription_id) REFERENCES user_subscriptions(id)
+        ON DELETE SET NULL
 );
 
 CREATE TABLE conversion_jobs (
@@ -570,6 +900,7 @@ CREATE TABLE conversion_jobs (
     user_id BIGINT UNSIGNED NULL,
     guest_token VARCHAR(100) NULL,
     source_ip VARCHAR(45) NULL,
+    source ENUM('WEB', 'API') NOT NULL DEFAULT 'WEB',
     original_file_name VARCHAR(255) NOT NULL,
     original_file_path VARCHAR(500) NOT NULL,
     output_file_name VARCHAR(255) NULL,
@@ -578,10 +909,13 @@ CREATE TABLE conversion_jobs (
     total_pages INT UNSIGNED NOT NULL,
     conversion_mode ENUM('FREE', 'PREMIUM') NOT NULL,
     processing_type ENUM('NORMAL', 'OCR') NOT NULL DEFAULT 'NORMAL',
+    conversion_settings JSON NULL,
+    batch_job_id BIGINT UNSIGNED NULL,
     coin_estimated INT UNSIGNED NOT NULL DEFAULT 0,
     coin_charged INT UNSIGNED NOT NULL DEFAULT 0,
-    status ENUM('PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'DELETED') NOT NULL DEFAULT 'PENDING',
+    status ENUM('PENDING', 'QUEUED', 'PROCESSING', 'SUCCESS', 'FAILED', 'EXPIRED', 'DELETED') NOT NULL DEFAULT 'PENDING',
     queue_priority TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    retry_count TINYINT UNSIGNED NOT NULL DEFAULT 0,
     error_message TEXT NULL,
     started_at DATETIME NULL,
     completed_at DATETIME NULL,
@@ -591,6 +925,9 @@ CREATE TABLE conversion_jobs (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_conversion_jobs_user
         FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE SET NULL,
+    CONSTRAINT fk_conversion_jobs_batch
+        FOREIGN KEY (batch_job_id) REFERENCES batch_jobs(id)
         ON DELETE SET NULL
 );
 
@@ -732,6 +1069,140 @@ CREATE TABLE admin_audit_logs (
 );
 ```
 
+## New Tables DDL
+
+```sql
+CREATE TABLE subscription_plans (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    price_vnd INT UNSIGNED NOT NULL,
+    duration_days INT UNSIGNED NOT NULL,
+    coin_bonus INT UNSIGNED NOT NULL DEFAULT 0,
+    priority_level TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    max_file_size_mb INT UNSIGNED NULL,
+    ocr_included BOOLEAN NOT NULL DEFAULT FALSE,
+    features JSON NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE user_subscriptions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    plan_id BIGINT UNSIGNED NOT NULL,
+    start_at DATETIME NOT NULL,
+    end_at DATETIME NOT NULL,
+    auto_renew BOOLEAN NOT NULL DEFAULT TRUE,
+    is_trial BOOLEAN NOT NULL DEFAULT FALSE,
+    payment_id BIGINT UNSIGNED NULL,
+    status ENUM('ACTIVE', 'EXPIRED', 'CANCELED', 'TRIAL') NOT NULL DEFAULT 'ACTIVE',
+    canceled_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_user_subscriptions_user
+        FOREIGN KEY (user_id) REFERENCES users(id),
+    CONSTRAINT fk_user_subscriptions_plan
+        FOREIGN KEY (plan_id) REFERENCES subscription_plans(id),
+    CONSTRAINT fk_user_subscriptions_payment
+        FOREIGN KEY (payment_id) REFERENCES payments(id)
+        ON DELETE SET NULL
+);
+
+CREATE TABLE batch_jobs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_code VARCHAR(64) NOT NULL UNIQUE,
+    user_id BIGINT UNSIGNED NOT NULL,
+    total_files INT UNSIGNED NOT NULL DEFAULT 0,
+    completed_files INT UNSIGNED NOT NULL DEFAULT 0,
+    failed_files INT UNSIGNED NOT NULL DEFAULT 0,
+    status ENUM('PROCESSING', 'COMPLETED', 'PARTIAL_SUCCESS', 'FAILED') NOT NULL DEFAULT 'PROCESSING',
+    zip_path VARCHAR(500) NULL,
+    zip_size_bytes BIGINT UNSIGNED NULL,
+    zip_expired_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_batch_jobs_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE api_keys (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    key_hash VARCHAR(255) NOT NULL,
+    prefix VARCHAR(20) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    rate_limit INT UNSIGNED NOT NULL DEFAULT 100,
+    status ENUM('ACTIVE', 'DISABLED', 'REVOKED') NOT NULL DEFAULT 'ACTIVE',
+    last_used_at DATETIME NULL,
+    expires_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_api_keys_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE webhooks (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    url VARCHAR(500) NOT NULL,
+    secret VARCHAR(255) NOT NULL,
+    events JSON NOT NULL,
+    status ENUM('ACTIVE', 'DISABLED') NOT NULL DEFAULT 'ACTIVE',
+    last_triggered_at DATETIME NULL,
+    last_http_status SMALLINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_webhooks_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE notifications (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NULL,
+    data JSON NULL,
+    action_url VARCHAR(500) NULL,
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    read_at DATETIME NULL,
+    email_sent_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_notifications_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE TABLE email_logs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NULL,
+    to_email VARCHAR(255) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    email_type VARCHAR(50) NOT NULL,
+    status ENUM('SENT', 'FAILED', 'BOUNCED', 'OPENED') NOT NULL DEFAULT 'SENT',
+    error_message TEXT NULL,
+    sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    opened_at DATETIME NULL,
+    CONSTRAINT fk_email_logs_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE SET NULL
+);
+
+CREATE TABLE virus_scans (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    conversion_job_id BIGINT UNSIGNED NOT NULL,
+    scanner VARCHAR(100) NOT NULL,
+    status ENUM('CLEAN', 'INFECTED', 'ERROR', 'SKIPPED') NOT NULL,
+    result TEXT NULL,
+    scanned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_virus_scans_conversion_job
+        FOREIGN KEY (conversion_job_id) REFERENCES conversion_jobs(id)
+        ON DELETE CASCADE
+);
+```
+
 ---
 
 # 7. Index đề xuất
@@ -764,8 +1235,23 @@ CREATE INDEX idx_support_tickets_status ON support_tickets(status);
 CREATE INDEX idx_support_tickets_issue_type ON support_tickets(issue_type);
 
 CREATE INDEX idx_support_messages_ticket_id ON support_messages(support_ticket_id);
+CREATE INDEX idx_support_messages_is_read ON support_messages(is_read);
+
 CREATE INDEX idx_chatbot_messages_conversation_id ON chatbot_messages(chatbot_conversation_id);
-```
+
+-- New table indexes
+CREATE INDEX idx_user_subscriptions_user_id ON user_subscriptions(user_id);
+CREATE INDEX idx_user_subscriptions_status ON user_subscriptions(status);
+CREATE INDEX idx_batch_jobs_user_id ON batch_jobs(user_id);
+CREATE INDEX idx_batch_jobs_status ON batch_jobs(status);
+CREATE INDEX idx_api_keys_user_id ON api_keys(user_id);
+CREATE INDEX idx_api_keys_status ON api_keys(status);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_email_logs_user_id ON email_logs(user_id);
+CREATE INDEX idx_email_logs_status ON email_logs(status);
+CREATE INDEX idx_virus_scans_job_id ON virus_scans(conversion_job_id);
+CREATE INDEX idx_virus_scans_status ON virus_scans(status);
 
 ---
 
@@ -783,7 +1269,13 @@ VALUES
 ('premium_file_storage_hours', '24', 'INT', 'Thời gian lưu file nâng cao'),
 ('coin_normal_per_page', '1', 'INT', 'Coin cho convert thường mỗi trang'),
 ('coin_ocr_per_page', '2', 'INT', 'Coin cho convert OCR mỗi trang'),
-('coin_after_30_pages_per_page', '3', 'INT', 'Coin cho mỗi trang sau trang 30');
+('coin_after_30_pages_per_page', '3', 'INT', 'Coin cho mỗi trang sau trang 30'),
+('max_file_size_premium_mb', '50', 'INT', 'Dung lượng tối đa cho nâng cao'),
+('max_pages_premium', '500', 'INT', 'Số trang tối đa cho nâng cao'),
+('file_retention_original_days', '7', 'INT', 'Thời gian lưu PDF gốc (ngày)'),
+('rate_limit_upload_per_minute', '10', 'INT', 'Giới hạn upload mỗi phút'),
+('rate_limit_chatbot_per_minute', '30', 'INT', 'Giới hạn chatbot mỗi phút'),
+('virus_scan_enabled', 'true', 'BOOLEAN', 'Bật/tắt quét virus');
 
 INSERT INTO coin_packages (name, price_vnd, coin_amount, description, sort_order)
 VALUES
@@ -837,6 +1329,28 @@ VALUES
 - Mỗi tin nhắn thuộc về một phiên chatbot.
 - Quan hệ:
   - `chatbot_conversations.id` → `chatbot_messages.chatbot_conversation_id`
+
+## 9.7. `users` và `user_subscriptions`
+
+- Một user có thể có nhiều subscription (active + history).
+- Mỗi subscription thuộc về một user và một plan.
+- Quan hệ:
+  - `users.id` → `user_subscriptions.user_id`
+  - `subscription_plans.id` → `user_subscriptions.plan_id`
+
+## 9.8. `batch_jobs` và `conversion_jobs`
+
+- Một batch chứa nhiều conversion job.
+- Mỗi conversion job trong batch có `batch_job_id` trỏ về batch.
+- Quan hệ:
+  - `batch_jobs.id` → `conversion_jobs.batch_job_id`
+
+## 9.9. `users` và `notifications`
+
+- Một user có nhiều notification.
+- Mỗi notification thuộc về một user.
+- Quan hệ:
+  - `users.id` → `notifications.user_id`
 
 ---
 
@@ -1007,16 +1521,18 @@ Nên có cron job hoặc background worker chạy định kỳ:
 Nếu muốn làm bản đầu tiên đơn giản, có thể bắt đầu với các bảng sau:
 
 1. `users`
-2. `coin_packages`
-3. `payments`
-4. `conversion_jobs`
-5. `coin_transactions`
-6. `free_conversion_usages`
-7. `support_tickets`
-8. `support_messages`
-9. `system_settings`
+2. `refresh_tokens`
+3. `password_reset_tokens`
+4. `coin_packages`
+5. `payments`
+6. `conversion_jobs`
+7. `coin_transactions`
+8. `free_conversion_usages`
+9. `support_tickets`
+10. `support_messages`
+11. `system_settings`
 
-Các bảng chatbot và audit log có thể thêm ở phiên bản nâng cấp.
+Các bảng chatbot, audit log và future tables có thể thêm ở phiên bản nâng cấp.
 
 ---
 
@@ -1024,19 +1540,31 @@ Các bảng chatbot và audit log có thể thêm ở phiên bản nâng cấp.
 
 Nên tạo bảng theo thứ tự sau để tránh lỗi khóa ngoại:
 
+### Bảng core (MVP)
 1. `users`
-2. `password_reset_tokens`
-3. `coin_packages`
-4. `payments`
-5. `conversion_jobs`
-6. `coin_transactions`
-7. `free_conversion_usages`
-8. `support_tickets`
-9. `support_messages`
-10. `chatbot_conversations`
-11. `chatbot_messages`
-12. `system_settings`
-13. `admin_audit_logs`
+2. `refresh_tokens`
+3. `password_reset_tokens`
+4. `coin_packages`
+5. `payments`
+6. `conversion_jobs`
+7. `coin_transactions`
+8. `free_conversion_usages`
+9. `support_tickets`
+10. `support_messages`
+11. `system_settings`
+12. `admin_audit_logs`
+
+### Bảng phase sau (có thể tạo migration riêng)
+13. `chatbot_conversations`
+14. `chatbot_messages`
+15. `subscription_plans` (Phase 4)
+16. `user_subscriptions` (Phase 4 — cần `payments` có trước)
+17. `batch_jobs` (Phase 3)
+18. `api_keys` (Phase 4)
+19. `webhooks` (Phase 4)
+20. `notifications` (Phase 3)
+21. `email_logs` (Phase 4)
+22. `virus_scans` (Phase 5 — cần `conversion_jobs` có trước)
 
 ---
 
