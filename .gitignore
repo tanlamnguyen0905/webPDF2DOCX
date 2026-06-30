@@ -105,3 +105,7 @@ stitch_pdf_coin_converter_system
 backup/
 *.patch
 *.diff
+
+stitch_convertpdf_platform_design_system
+
+log/
