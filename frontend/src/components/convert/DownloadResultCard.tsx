@@ -45,7 +45,6 @@ export function DownloadResultCard({ id, fileName, expiredAt, onRetry }: Downloa
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
     } catch {
       // silent — toast handled upstream
     } finally {

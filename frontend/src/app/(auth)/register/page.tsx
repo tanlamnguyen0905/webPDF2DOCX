@@ -45,7 +45,7 @@ export default function RegisterPage() {
     try {
       await register(email, password, fullName || undefined);
       setSuccess(true);
-      setTimeout(() => router.push('/login'), 1500);
+      setTimeout(() => router.push('/dashboard'), 1500);
     } catch (err: any) {
       const msg = err?.response?.data?.message;
       if (msg) setError(msg);
