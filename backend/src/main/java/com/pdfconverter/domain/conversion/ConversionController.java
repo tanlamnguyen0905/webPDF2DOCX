@@ -94,7 +94,7 @@ public class ConversionController {
                 u.setUsageDate(LocalDate.now());
                 u.setUsedCount(0);
                 u.setDailyLimit(5);
-                return u;
+                return freeConversionUsageRepository.save(u);
             });
             if (usage.getUsedCount() >= usage.getDailyLimit()) {
                 throw new BusinessException(ErrorCode.FREE_LIMIT_EXCEEDED, "Đã vượt quá giới hạn chuyển đổi miễn phí hôm nay");
@@ -307,6 +307,6 @@ public class ConversionController {
 
     private String generateRequestCode() {
         return "CVT-" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "-"
-                + String.format("%04d", (int) (Math.random() * 10000));
+                + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 }
