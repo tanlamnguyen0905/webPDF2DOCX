@@ -38,10 +38,14 @@ apiClient.interceptors.response.use(
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
-        }).then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return apiClient(originalRequest);
-        });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
       }
       originalRequest._retry = true;
       isRefreshing = true;
@@ -53,6 +57,7 @@ apiClient.interceptors.response.use(
           { refreshToken },
         );
         const newToken = data.data?.accessToken ?? data.accessToken;
+        if (!newToken) throw new Error('Refresh response missing access token');
         window.localStorage.setItem('accessToken', newToken);
         processQueue(null, newToken);
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
