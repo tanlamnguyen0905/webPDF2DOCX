@@ -8,11 +8,12 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 /**
- * Khởi tạo S3 + SQS client trỏ vào LocalStack ở local (endpoint override).
- * Production bỏ endpoint override để dùng AWS thật.
+ * Khoi tao S3 + SQS + S3Presigner client tro vao LocalStack o local (endpoint override).
+ * Production bo endpoint override de dung AWS that.
  */
 @Configuration
 public class AwsConfig {
@@ -39,7 +40,16 @@ public class AwsConfig {
                 .region(Region.of(region))
                 .credentialsProvider(credentials())
                 .endpointOverride(URI.create(endpointUrl))
-                .forcePathStyle(true) // cần cho LocalStack
+                .forcePathStyle(true) // can cho LocalStack
+                .build();
+    }
+
+    @Bean
+    public S3Presigner s3Presigner() {
+        return S3Presigner.builder()
+                .region(Region.of(region))
+                .endpointOverride(URI.create(endpointUrl))
+                .credentialsProvider(credentials())
                 .build();
     }
 
