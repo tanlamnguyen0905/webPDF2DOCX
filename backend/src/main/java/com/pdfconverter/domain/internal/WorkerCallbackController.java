@@ -59,7 +59,8 @@ public class WorkerCallbackController {
         ConversionJob job = conversionJobRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Conversion job not found"));
 
-        job.setStatus(ConversionStatus.SUCCESS);
+        rejectIfNotTransient(job);
+
         job.setOutputFilePath(body.get("s3OutputKey"));
         job.setOutputFileName(body.get("outputFileName"));
         job.setFileExpiredAt(LocalDateTime.now().plusHours(
@@ -68,21 +69,27 @@ public class WorkerCallbackController {
         if (job.getConversionMode() == ConversionMode.PREMIUM) {
             User user = userRepository.findByIdWithLock(job.getUserId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "User not found"));
-            if (user.getCoinBalance() >= job.getCoinEstimated()) {
-                user.setCoinBalance(user.getCoinBalance() - job.getCoinEstimated());
-                userRepository.save(user);
-
-                CoinTransaction tx = CoinTransaction.deduct(
-                        user.getId(), job.getId(), job.getCoinEstimated(),
-                        user.getCoinBalance() + job.getCoinEstimated(),
-                        CoinTransactionReason.CONVERSION_DEDUCTION.name());
-                tx.setTransactionCode("DEDUCT-" + job.getId() + "-" + System.currentTimeMillis());
-                coinTransactionRepository.save(tx);
-
-                job.setCoinCharged(job.getCoinEstimated());
+            if (user.getCoinBalance() < job.getCoinEstimated()) {
+                job.setStatus(ConversionStatus.FAILED);
+                job.setErrorMessage("Insufficient coin balance: " + user.getCoinBalance()
+                        + " < " + job.getCoinEstimated());
+                conversionJobRepository.save(job);
+                return ApiResponse.ok(null, "Job failed due to insufficient coins");
             }
+            user.setCoinBalance(user.getCoinBalance() - job.getCoinEstimated());
+            userRepository.save(user);
+
+            CoinTransaction tx = CoinTransaction.deduct(
+                    user.getId(), job.getId(), job.getCoinEstimated(),
+                    user.getCoinBalance() + job.getCoinEstimated(),
+                    CoinTransactionReason.CONVERSION_DEDUCTION.name());
+            tx.setTransactionCode("DEDUCT-" + job.getId() + "-" + System.currentTimeMillis());
+            coinTransactionRepository.save(tx);
+
+            job.setCoinCharged(job.getCoinEstimated());
         }
 
+        job.setStatus(ConversionStatus.SUCCESS);
         conversionJobRepository.save(job);
         return ApiResponse.ok(null, "Job completed");
     }
@@ -95,6 +102,8 @@ public class WorkerCallbackController {
         validateWorkerToken(token);
         ConversionJob job = conversionJobRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Conversion job not found"));
+
+        rejectIfNotTransient(job);
 
         job.setStatus(ConversionStatus.FAILED);
         job.setErrorMessage(body.get("errorMessage"));
@@ -117,6 +126,14 @@ public class WorkerCallbackController {
 
         conversionJobRepository.save(job);
         return ApiResponse.ok(null, "Job failed acknowledged");
+    }
+
+    private void rejectIfNotTransient(ConversionJob job) {
+        ConversionStatus s = job.getStatus();
+        if (s == ConversionStatus.SUCCESS || s == ConversionStatus.FAILED) {
+            throw new BusinessException(ErrorCode.CONVERSION_ALREADY_PROCESSED,
+                    "Job already in terminal state: " + s);
+        }
     }
 
     private void validateWorkerToken(String token) {
