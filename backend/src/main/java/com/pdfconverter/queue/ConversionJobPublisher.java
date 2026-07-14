@@ -2,6 +2,7 @@ package com.pdfconverter.queue;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
@@ -14,6 +15,8 @@ import java.util.Map;
  */
 @Service
 public class ConversionJobPublisher {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final SqsClient sqsClient;
     private final String queueUrl;
@@ -36,7 +39,7 @@ public class ConversionJobPublisher {
 
         String body;
         try {
-            body = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(message);
+            body = OBJECT_MAPPER.writeValueAsString(message);
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize SQS message", e);
         }
