@@ -29,6 +29,9 @@ public class ConversionJob {
     @Column(name = "guest_token", length = 100)
     private String guestToken;
 
+    @Column(name = "idempotency_key", length = 255)
+    private String idempotencyKey;
+
     @Column(name = "original_file_name", nullable = false)
     private String originalFileName;
 

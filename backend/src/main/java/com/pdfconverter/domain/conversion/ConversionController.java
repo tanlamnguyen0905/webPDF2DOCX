@@ -72,6 +72,13 @@ public class ConversionController {
         ProcessingType procType = request.processingType() != null ? request.processingType() : ProcessingType.NORMAL;
         int estimatedCoin = UploadController.estimateCoin(totalPages, mode, procType);
 
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            Optional<ConversionJob> existing = conversionJobRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                return ApiResponse.ok(ConversionJobDto.from(existing.get()), "Conversion job already exists");
+            }
+        }
+
         Long userId = userContext.getCurrentUserId().orElse(null);
 
         if (mode == ConversionMode.FREE) {
@@ -122,6 +129,7 @@ public class ConversionController {
         job.setProcessingType(procType);
         job.setCoinEstimated(estimatedCoin);
         job.setStatus(ConversionStatus.QUEUED);
+        job.setIdempotencyKey(idempotencyKey);
         job = conversionJobRepository.save(job);
 
         String sourceKey = s3StorageService.generateSourceKey(job.getId(), originalFileName);

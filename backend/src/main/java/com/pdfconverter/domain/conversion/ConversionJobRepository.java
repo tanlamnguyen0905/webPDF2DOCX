@@ -9,5 +9,7 @@ public interface ConversionJobRepository extends JpaRepository<ConversionJob, Lo
 
     Optional<ConversionJob> findByRequestCode(String requestCode);
 
+    Optional<ConversionJob> findByIdempotencyKey(String idempotencyKey);
+
     Page<ConversionJob> findAllByUserId(Long userId, Pageable pageable);
 }
