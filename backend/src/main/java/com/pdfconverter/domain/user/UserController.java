@@ -1,5 +1,7 @@
 package com.pdfconverter.domain.user;
 
+import com.pdfconverter.common.exception.BusinessException;
+import com.pdfconverter.common.exception.ErrorCode;
 import com.pdfconverter.common.response.ApiResponse;
 import com.pdfconverter.domain.auth.AuthService;
 import com.pdfconverter.domain.auth.UserContext;
@@ -27,21 +29,21 @@ public class UserController {
     @GetMapping("/me")
     public ApiResponse<UserDto> getMe() {
         Long userId = userContext.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthenticated"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ACCESS_DENIED, "Unauthenticated"));
         return ApiResponse.ok(authService.getCurrentUser(userId));
     }
 
     @PatchMapping("/me")
     public ApiResponse<UserDto> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         Long userId = userContext.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthenticated"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ACCESS_DENIED, "Unauthenticated"));
         return ApiResponse.ok(authService.updateProfile(userId, request));
     }
 
     @PostMapping("/me/avatar")
     public ApiResponse<Map<String, String>> updateAvatar(@RequestParam("file") MultipartFile file) {
         Long userId = userContext.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthenticated"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ACCESS_DENIED, "Unauthenticated"));
         // Store avatar directly in DB as URL — upload to S3 handled elsewhere
         String avatarUrl = "/uploads/avatars/" + userId + "/" + System.currentTimeMillis() + ".jpg";
         String saved = authService.updateAvatar(userId, avatarUrl);
@@ -51,7 +53,7 @@ public class UserController {
     @PatchMapping("/me/password")
     public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         Long userId = userContext.getCurrentUserId()
-                .orElseThrow(() -> new RuntimeException("Unauthenticated"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ACCESS_DENIED, "Unauthenticated"));
         authService.changePassword(userId, request);
         return ResponseEntity.noContent().build();
     }
