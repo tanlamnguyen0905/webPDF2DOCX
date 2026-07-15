@@ -29,8 +29,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private static final Set<String> SKIP_PATHS = Set.of(
             "/api/v1/auth/**",
             "/api/v1/internal/**",
-            "/api/v1/uploads/pdf/preview",
-            "/api/v1/conversions/free-usage/today"
+            "/api/v1/uploads/pdf/preview"
     );
 
     @Override

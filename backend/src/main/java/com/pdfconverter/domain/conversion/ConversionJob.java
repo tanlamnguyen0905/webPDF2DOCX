@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 /**
  * Entity ánh xạ bảng conversion_jobs. Xem done/TechSpec/schema.md §5.5.
@@ -12,6 +13,7 @@ import org.springframework.data.annotation.LastModifiedDate;
  */
 @Entity
 @Table(name = "conversion_jobs")
+@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
 public class ConversionJob {

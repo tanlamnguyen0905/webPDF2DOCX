@@ -12,6 +12,8 @@ import com.pdfconverter.domain.conversion.ConversionMode;
 import com.pdfconverter.domain.conversion.ConversionStatus;
 import com.pdfconverter.domain.user.User;
 import com.pdfconverter.domain.user.UserRepository;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +42,7 @@ public class WorkerCallbackController {
     public ApiResponse<Void> started(@PathVariable Long id,
                                      @RequestHeader("X-Worker-Token") String token) {
         validateWorkerToken(token);
-        ConversionJob job = conversionJobRepository.findById(id)
+        ConversionJob job = conversionJobRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Conversion job not found"));
         if (job.getStatus() != ConversionStatus.QUEUED) {
             throw new BusinessException(ErrorCode.CONVERSION_ALREADY_PROCESSED, "Job already processing");
@@ -56,7 +58,7 @@ public class WorkerCallbackController {
                                        @RequestHeader("X-Worker-Token") String token,
                                        @RequestBody Map<String, String> body) {
         validateWorkerToken(token);
-        ConversionJob job = conversionJobRepository.findById(id)
+        ConversionJob job = conversionJobRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Conversion job not found"));
 
         rejectIfNotTransient(job);
@@ -100,7 +102,7 @@ public class WorkerCallbackController {
                                     @RequestHeader("X-Worker-Token") String token,
                                     @RequestBody Map<String, String> body) {
         validateWorkerToken(token);
-        ConversionJob job = conversionJobRepository.findById(id)
+        ConversionJob job = conversionJobRepository.findByIdWithLock(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Conversion job not found"));
 
         rejectIfNotTransient(job);
@@ -137,7 +139,9 @@ public class WorkerCallbackController {
     }
 
     private void validateWorkerToken(String token) {
-        if (!workerSecret.equals(token)) {
+        if (!MessageDigest.isEqual(
+                workerSecret.getBytes(StandardCharsets.UTF_8),
+                token.getBytes(StandardCharsets.UTF_8))) {
             throw new BusinessException(ErrorCode.WORKER_TOKEN_INVALID, "Worker token không hợp lệ");
         }
     }
