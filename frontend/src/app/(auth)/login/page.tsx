@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/Input';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/dashboard';
+  const rawRedirect = searchParams.get('redirect');
+  const redirect = rawRedirect && (rawRedirect.startsWith('/')) ? rawRedirect : '/dashboard';
   const { login } = useAuth();
 
   const [email, setEmail] = useState('');

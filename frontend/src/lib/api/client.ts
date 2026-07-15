@@ -1,5 +1,19 @@
 import axios from 'axios';
-import type { ApiListResponse } from '@/lib/types';
+import type {
+  ApiListResponse,
+  CreateConversionRequest,
+  CreateConversionResponse,
+  ConversionStatusResponse,
+  ConversionJobDto,
+  UploadPreviewResponse,
+  CoinPackageDto,
+  CoinTransactionDto,
+  PaymentDto,
+  TicketDto,
+  UserDto,
+  DashboardStats,
+  AuthTokens,
+} from '@/lib/types';
 
 export const apiClient = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080/api/v1',
@@ -112,20 +126,20 @@ export const conversionApi = {
     }),
   deleteUpload: (uploadToken: string) =>
     apiClient.delete(`/uploads/pdf/preview`, { data: { uploadToken } }),
-  createConversion: (data: any, idempotencyKey: string) =>
-    apiClient.post('/conversions', data, {
+  createConversion: (data: CreateConversionRequest, idempotencyKey: string) =>
+    apiClient.post<CreateConversionResponse>('/conversions', data, {
       headers: { 'Idempotency-Key': idempotencyKey },
     }),
-  getById: (id: number) => apiClient.get(`/conversions/${id}`),
+  getById: (id: number) => apiClient.get<ConversionJobDto>(`/conversions/${id}`),
   getConversionStatus: (id: number) =>
-    apiClient.get(`/conversions/${id}/status`),
+    apiClient.get<ConversionStatusResponse>(`/conversions/${id}/status`),
   list: (params?: { page?: number; size?: number; status?: string; mode?: string }) =>
-    apiClient.get<ApiListResponse<any>>('/conversions', { params }),
+    apiClient.get<ApiListResponse<ConversionJobDto>>('/conversions', { params }),
   startConversion: (id: number, mode: string) =>
     apiClient.post(`/conversions/${id}/start`, { conversionMode: mode }),
   downloadUrl: (id: number) =>
     apiClient.get<{ url: string }>(`/conversions/${id}/download-url`),
-  retryConversion: (id: number, data?: any) =>
+  retryConversion: (id: number, data?: CreateConversionRequest) =>
     apiClient.post(`/conversions/${id}/retry`, data ?? {}),
   cancelConversion: (id: number) =>
     apiClient.post(`/conversions/${id}/cancel`),
@@ -140,13 +154,13 @@ export const coinApi = {
   createPayment: (data: { packageId: number; method: string }) =>
     apiClient.post('/payments', data),
   listTransactions: (params?: { page?: number; size?: number; type?: string }) =>
-    apiClient.get<ApiListResponse<any>>('/coin-transactions', { params }),
+    apiClient.get<ApiListResponse<CoinTransactionDto>>('/coin-transactions', { params }),
 };
 
 export const paymentApi = {
   list: (params?: { page?: number; size?: number; status?: string }) =>
-    apiClient.get<ApiListResponse<any>>('/payments', { params }),
-  getById: (id: number) => apiClient.get(`/payments/${id}`),
+    apiClient.get<ApiListResponse<PaymentDto>>('/payments', { params }),
+  getById: (id: number) => apiClient.get<PaymentDto>(`/payments/${id}`),
 };
 
 // ---- Ticket API ----
@@ -154,32 +168,32 @@ export const ticketApi = {
   create: (data: { title: string; issueType: string; content: string }) =>
     apiClient.post('/tickets', data),
   list: (params?: { page?: number; size?: number; status?: string }) =>
-    apiClient.get<ApiListResponse<any>>('/tickets', { params }),
-  getById: (id: number) => apiClient.get(`/tickets/${id}`),
+    apiClient.get<ApiListResponse<TicketDto>>('/tickets', { params }),
+  getById: (id: number) => apiClient.get<TicketDto>(`/tickets/${id}`),
   reply: (id: number, data: { content: string }) =>
     apiClient.post(`/tickets/${id}/reply`, data),
 };
 
 // ---- Admin API ----
 export const adminApi = {
-  dashboardStats: () => apiClient.get('/admin/dashboard'),
+  dashboardStats: () => apiClient.get<DashboardStats>('/admin/dashboard'),
   listUsers: (params?: { page?: number; size?: number; search?: string }) =>
-    apiClient.get<ApiListResponse<any>>('/admin/users', { params }),
-  getUserById: (id: number) => apiClient.get(`/admin/users/${id}`),
-  updateUser: (id: number, data: Partial<any>) => apiClient.put(`/admin/users/${id}`, data),
-  listCoinPackages: () => apiClient.get('/admin/coin-packages'),
-  createCoinPackage: (data: any) => apiClient.post('/admin/coin-packages', data),
-  updateCoinPackage: (id: number, data: any) => apiClient.put(`/admin/coin-packages/${id}`, data),
+    apiClient.get<ApiListResponse<UserDto>>('/admin/users', { params }),
+  getUserById: (id: number) => apiClient.get<UserDto>(`/admin/users/${id}`),
+  updateUser: (id: number, data: Partial<{ fullName?: string; role?: string; status?: string }>) => apiClient.put(`/admin/users/${id}`, data),
+  listCoinPackages: () => apiClient.get<CoinPackageDto[]>('/admin/coin-packages'),
+  createCoinPackage: (data: Omit<CoinPackageDto, 'id'>) => apiClient.post<CoinPackageDto>('/admin/coin-packages', data),
+  updateCoinPackage: (id: number, data: Partial<CoinPackageDto>) => apiClient.put<CoinPackageDto>(`/admin/coin-packages/${id}`, data),
   deleteCoinPackage: (id: number) => apiClient.delete(`/admin/coin-packages/${id}`),
   listConversions: (params?: { page?: number; size?: number }) =>
-    apiClient.get<ApiListResponse<any>>('/admin/conversions', { params }),
+    apiClient.get<ApiListResponse<ConversionJobDto>>('/admin/conversions', { params }),
   listPayments: (params?: { page?: number; size?: number }) =>
-    apiClient.get<ApiListResponse<any>>('/admin/payments', { params }),
+    apiClient.get<ApiListResponse<PaymentDto>>('/admin/payments', { params }),
   listTickets: (params?: { page?: number; size?: number }) =>
-    apiClient.get<ApiListResponse<any>>('/admin/tickets', { params }),
-  listSupportUsers: () => apiClient.get('/admin/support-users'),
+    apiClient.get<ApiListResponse<TicketDto>>('/admin/tickets', { params }),
+  listSupportUsers: () => apiClient.get<UserDto[]>('/admin/support-users'),
   listAuditLogs: (params?: { page?: number; size?: number }) =>
-    apiClient.get<ApiListResponse<any>>('/admin/audit-logs', { params }),
+    apiClient.get<ApiListResponse<Record<string, unknown>>>('/admin/audit-logs', { params }),
   updateTicketStatus: (id: number, status: string) =>
     apiClient.put(`/admin/tickets/${id}/status`, { status }),
 };

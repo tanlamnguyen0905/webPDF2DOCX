@@ -17,6 +17,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function setTokenCookie(token: string) {
+  document.cookie = `accessToken=${token}; path=/; sameSite=lax; max-age=${7 * 24 * 60 * 60}`;
+}
+
+function clearTokenCookie() {
+  document.cookie = 'accessToken=; path=/; sameSite=lax; max-age=0';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken ?? '');
+    setTokenCookie(tokens.accessToken);
     await refreshUser();
   };
 
@@ -53,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (tokens.accessToken) {
       localStorage.setItem('accessToken', tokens.accessToken);
       localStorage.setItem('refreshToken', tokens.refreshToken ?? '');
+      setTokenCookie(tokens.accessToken);
       await refreshUser();
     }
   };
@@ -65,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    clearTokenCookie();
     setUser(null);
   };
 

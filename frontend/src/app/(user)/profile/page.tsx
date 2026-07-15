@@ -28,8 +28,6 @@ export default function ProfilePage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
-  if (!authLoading && !user) return null;
-
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
