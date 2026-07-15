@@ -6,6 +6,8 @@ import com.pdfconverter.common.response.ApiResponse;
 import com.pdfconverter.common.response.PageResponse;
 import com.pdfconverter.domain.auth.GuestContext;
 import com.pdfconverter.domain.auth.UserContext;
+import com.pdfconverter.domain.user.User;
+import com.pdfconverter.domain.user.UserRepository;
 import com.pdfconverter.queue.ConversionJobPublisher;
 import com.pdfconverter.security.JwtTokenProvider;
 import com.pdfconverter.storage.S3StorageService;
@@ -38,6 +40,7 @@ public class ConversionController {
 
     private final ConversionJobRepository conversionJobRepository;
     private final FreeConversionUsageRepository freeConversionUsageRepository;
+    private final UserRepository userRepository;
     private final ConversionJobPublisher conversionJobPublisher;
     private final S3StorageService s3StorageService;
     private final JwtTokenProvider jwtTokenProvider;
@@ -103,7 +106,8 @@ public class ConversionController {
                 u.setDailyLimit(5);
                 return freeConversionUsageRepository.save(u);
             });
-            if (usage.getUsedCount() >= usage.getDailyLimit()) {
+            int updated = freeConversionUsageRepository.incrementIfUnderLimit(identityType, identityValue, LocalDate.now());
+            if (updated == 0) {
                 throw new BusinessException(ErrorCode.FREE_LIMIT_EXCEEDED, "Đã vượt quá giới hạn chuyển đổi miễn phí hôm nay");
             }
         } else {
@@ -112,6 +116,12 @@ public class ConversionController {
             }
             if (!request.confirmCoin()) {
                 throw new BusinessException(ErrorCode.INSUFFICIENT_COIN, "Bạn cần xác nhận số coin sẽ sử dụng");
+            }
+            User user = userRepository.findByIdWithLock(userId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "User not found"));
+            if (user.getCoinBalance() < estimatedCoin) {
+                throw new BusinessException(ErrorCode.INSUFFICIENT_COIN,
+                        "Số coin không đủ: " + user.getCoinBalance() + " < " + estimatedCoin);
             }
         }
 
@@ -137,14 +147,6 @@ public class ConversionController {
 
         conversionJobPublisher.publish(job.getId(), s3StorageService.getBucket(), sourceKey,
                 procType.name(), mode.name());
-
-        if (mode == ConversionMode.FREE) {
-            String identityValue = userId != null ? "user:" + userId : (guestToken != null ? "guest:" + guestToken : "ip:" + guestContext.getClientIp());
-            FreeConversionUsage.IdentityType identityType = userId != null
-                    ? FreeConversionUsage.IdentityType.USER
-                    : FreeConversionUsage.IdentityType.GUEST;
-            freeConversionUsageRepository.incrementIfUnderLimit(identityType, identityValue, LocalDate.now());
-        }
 
         return ApiResponse.ok(ConversionJobDto.from(job), "Conversion job created");
     }
